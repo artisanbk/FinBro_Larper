@@ -18,7 +18,7 @@ A single-player, 7-day stock market trading game.
   - **Page:** order book panel, live tape of real trades, volume bars, Portfolio panel, fill toasts with a chime, and keyboard shortcuts.
   - **Packaging and tests:** offline vendored JS, the PyInstaller build, a 55-test pytest suite, a build smoke test (`tests/smoke_executable.py`), and GitHub workflows for tests, builds and draft releases.
 - **Git:** public repo at `github.com/artisanbk/FinBro_Larper`. Both workflows pass on GitHub, and the Linux and Windows builds pass the smoke test there.
-- **Release:** v1.0.0 is a **draft** GitHub release (tag on `a4846dc`) with both executables and `SHA256SUMS.txt`, waiting for the user to publish it.
+- **Release:** v1.0.0 was published on 2026-11-12 as the latest GitHub release (tag on `a4846dc`), with both executables and `SHA256SUMS.txt`.
 - **Never checked in a real browser by Claude:** the development environment had none. UI behaviour is verified by `tests/page_harness.js`, which runs the page's real script in Node with stubbed DOM and charts. Layout and visuals are unverified.
 
 ## Key decisions and why
