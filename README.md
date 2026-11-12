@@ -110,7 +110,7 @@ To build for Linux and Windows without a Windows machine, run **Build executable
 ### Release
 
 1. Add a `## vX.Y.Z (date)` section to `CHANGELOG.md`. It becomes the release notes.
-2. Commit it, then tag and push: `git tag v1.0.0 && git push origin main v1.0.0`.
+2. Commit and push it, then tag and push the tag on its own: `git push origin main && git tag -a v1.0.0 -m "FinBro_Larper v1.0.0" && git push origin v1.0.0`. If you push the branch and the tag in one command, GitHub may not start the tag's build. If that happens, run `gh workflow run build.yml --ref v1.0.0`.
 3. The tag runs **Build executables**. It ends by creating a **draft** release with both files, `SHA256SUMS.txt` and that changelog section.
 4. Check the draft on the Releases page and publish it.
 

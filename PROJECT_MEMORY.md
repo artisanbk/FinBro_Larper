@@ -17,8 +17,8 @@ A single-player, 7-day stock market trading game.
   - The agent market with real order books. Orders support market/limit, partial fills, reserved cash and holdings, self-trade prevention, a $5 per-order fee, and fractional crypto.
   - **Page:** order book panel, live tape of real trades, volume bars, Portfolio panel, fill toasts with a chime, and keyboard shortcuts.
   - **Packaging and tests:** offline vendored JS, the PyInstaller build, a 55-test pytest suite, a build smoke test (`tests/smoke_executable.py`), and GitHub workflows for tests, builds and draft releases.
-- **Git:** public repo at `github.com/artisanbk/FinBro_Larper`. The workflows were recreated on 2026-11-12 and haven't run on GitHub yet. A local Linux build passes the smoke test.
-- **Release prep:** `CHANGELOG.md` has the v1.0.0 notes. Pushing tag `v1.0.0` builds Linux and Windows and creates a draft release to review and publish.
+- **Git:** public repo at `github.com/artisanbk/FinBro_Larper`. Both workflows pass on GitHub, and the Linux and Windows builds pass the smoke test there.
+- **Release:** v1.0.0 is a **draft** GitHub release (tag on `a4846dc`) with both executables and `SHA256SUMS.txt`, waiting for the user to publish it.
 - **Never checked in a real browser by Claude:** the development environment had none. UI behaviour is verified by `tests/page_harness.js`, which runs the page's real script in Node with stubbed DOM and charts. Layout and visuals are unverified.
 
 ## Key decisions and why
@@ -58,7 +58,7 @@ A single-player, 7-day stock market trading game.
 ## Open items and ideas
 
 - **Volatility:** quiet-period volatility is about 65–80% of target. Raising `config.PROFILES[...].daily_vol` would close the gap.
-- **Builds:** the workflows are untested on GitHub. There's no macOS build (the user asked for Linux and Windows). The executables are unsigned, so Windows SmartScreen warns on first launch.
+- **Builds:** There's no macOS build (the user asked for Linux and Windows). The executables are unsigned, so Windows SmartScreen warns on first launch.
 - **One game per server:** everyone who connects shares the same week. That only matters if it's ever hosted for multiple players.
 - **Unread ideas file:** `../ideas.md`, outside the project folder, holds the user's original ideas. Claude Code couldn't read it because reads outside the working directory are blocked; `/add-dir ..` allows it.
 - **Historical files:** `chat_memory.md` holds notes from an early debugging chat and `stock_market_simulator.html` is the original draft. Neither describes the current code.
