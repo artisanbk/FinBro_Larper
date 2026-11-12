@@ -70,6 +70,21 @@ async def play(port: int) -> None:
         print(f"ok   traded and ticked: {result['message']} / clock {tick['clock']}")
 
 
+def stop(process: subprocess.Popen) -> None:
+    if os.name == "nt":
+        # A one-file build is a launcher plus the game process it unpacks and starts, and
+        # terminate() would only end the launcher. Kill the whole tree instead.
+        subprocess.run(["taskkill", "/PID", str(process.pid), "/T", "/F"], capture_output=True)
+    else:
+        process.send_signal(signal.SIGINT)  # Ctrl+C: the launcher's normal way to quit (forwarded to the game)
+    try:
+        process.wait(timeout=15)
+    except subprocess.TimeoutExpired:
+        process.kill()
+        raise SystemExit("FAIL: didn't exit within 15 s of being stopped")
+    time.sleep(1)  # let the OS release the game's files and port
+
+
 def main() -> None:
     exe = Path(sys.argv[1]).resolve()
     port = free_port()
@@ -78,7 +93,7 @@ def main() -> None:
     dbs_before = set(glob.glob(os.path.join(tmp, "finbro_larper_*.db")))
 
     # Run from another directory, so nothing can be picked up from the source tree.
-    with tempfile.TemporaryDirectory() as cwd:
+    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as cwd:
         process = subprocess.Popen([str(exe), "--no-browser", "--port", str(port)], cwd=cwd)
         try:
             page = wait_until_serving(base, process)
@@ -90,17 +105,15 @@ def main() -> None:
             print(f"ok   page and {len(scripts)} vendored scripts are bundled")
             asyncio.run(play(port))
         finally:
-            if os.name == "nt":
-                process.terminate()
-            else:
-                process.send_signal(signal.SIGINT)  # Ctrl+C: the launcher's normal way to quit
-            try:
-                process.wait(timeout=15)
-            except subprocess.TimeoutExpired:
-                process.kill()
-                raise SystemExit("FAIL: didn't exit within 15 s of Ctrl+C")
+            stop(process)
+        # The game process must be gone too, not just the one-file launcher that started it.
+        try:
+            get(f"{base}/static/index.html")
+            raise SystemExit("FAIL: still serving after it was stopped")
+        except OSError:
+            pass
 
-    if os.name != "nt":  # Windows can only hard-kill it, which skips the cleanup
+    if os.name != "nt":  # on Windows it's hard-killed, which skips the cleanup
         left = set(glob.glob(os.path.join(tmp, "finbro_larper_*.db"))) - dbs_before
         assert not left, f"temp database not deleted on exit: {left}"
         print("ok   quit cleanly and deleted its temp database")
