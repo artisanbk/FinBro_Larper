@@ -14,7 +14,7 @@ from database import Base, engine
 from config import TICK_SECONDS
 from game import Game
 
-logger = logging.getLogger("stock_simulator")
+logger = logging.getLogger("finbro_larper")
 # In a PyInstaller build, bundled files are unpacked to sys._MEIPASS rather than next to this module.
 BUNDLE_DIR = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent))
 STATIC_DIR = BUNDLE_DIR / "static"

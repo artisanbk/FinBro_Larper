@@ -1,6 +1,6 @@
-"""Launch Pro Trader Sim: start the server and open the game in the browser.
+"""Launch FinBro_Larper: start the server and open the game in the browser.
 
-This is the entry point of the packaged app (see pro_trader_sim.spec). It also works from source:
+This is the entry point of the packaged app (see finbro_larper.spec). It also works from source:
     venv/bin/python run.py [--port 8000] [--no-browser]
 """
 
@@ -36,7 +36,7 @@ def free_port(preferred: int) -> int:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Pro Trader Sim")
+    parser = argparse.ArgumentParser(description="FinBro_Larper")
     parser.add_argument("--port", type=int, default=8000, help="port to serve on (another is used if it's taken)")
     parser.add_argument("--no-browser", action="store_true", help="don't open the browser")
     args = parser.parse_args()
@@ -55,7 +55,7 @@ def main() -> None:
             if server.should_exit:
                 return
             time.sleep(0.1)
-        print(f"Pro Trader Sim is running at {url}\nClose this window or press Ctrl+C to quit.", flush=True)
+        print(f"FinBro_Larper is running at {url}\nClose this window or press Ctrl+C to quit.", flush=True)
         if not args.no_browser:
             webbrowser.open(url)
 

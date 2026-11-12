@@ -5,22 +5,25 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Commands
 
 ```sh
-venv/bin/pip install -r requirements.txt        # install deps (venv is Python 3.14)
+python3 -m venv venv                            # venv/ is gitignored, so create it on a fresh clone (system python3 is 3.14)
+venv/bin/pip install -r requirements.txt        # install deps
 venv/bin/uvicorn main:app --reload              # dev server at http://127.0.0.1:8000
 venv/bin/python run.py [--port N] [--no-browser] # launcher: free port, opens the browser (the packaged entry point)
 
 venv/bin/pip install -r requirements-build.txt  # PyInstaller (pinned)
-venv/bin/pyinstaller --noconfirm --clean pro_trader_sim.spec   # -> dist/ProTraderSim, single file, about 25 MB
+venv/bin/pyinstaller --noconfirm --clean finbro_larper.spec   # -> dist/FinBro_Larper, single file, about 25 MB
 ```
 
 Every server start begins a fresh 7-day game: `lifespan` drops and recreates all tables. Model changes therefore never need a migration, and with `--reload` every saved edit restarts the game.
 
 **Packaging (PyInstaller, one file).**
-- `pro_trader_sim.spec` bundles `static/` and collects uvicorn's submodules.
+- `finbro_larper.spec` bundles `static/` and collects uvicorn's submodules.
 - `run.py` names uvicorn's `http`/`ws`/`loop`/`lifespan` explicitly. Auto-detection imports modules by name at runtime, which a frozen build can't find.
 - In a frozen build, `main.BUNDLE_DIR` is `sys._MEIPASS` and `database.DB_PATH` is a per-process file in the temp dir, which `run.py` deletes on exit. From source it's `simulator.db` next to the code.
-- PyInstaller can't cross-compile: `.github/workflows/build.yml` builds Linux, Windows and macOS on GitHub Actions. It uploads `ProTraderSim-<OS>.exe` / `.tar.gz`, because artifact uploads drop the executable bit, and the README's download instructions depend on those names. It's untested, since there's no repo/remote yet; `macos-latest` produces an Apple Silicon build only.
-- To verify a build, run `dist/ProTraderSim --no-browser --port 8765` from another directory and drive it like the dev server.
+- `finbro_larper.spec` must stay tracked. `.gitignore` ignores `*.spec` (PyInstaller's generated ones) and re-includes it with `!finbro_larper.spec`.
+- PyInstaller can't cross-compile, so `.github/workflows/build.yml` builds on GitHub Actions (remote: `github.com/artisanbk/FinBro_Larper`, public). Its matrix is Linux on `ubuntu-22.04` and Windows; there's no macOS build. Linux stays on 22.04 because a binary needs its build machine's glibc or newer. This machine runs Arch (glibc 2.44), so a local Linux build won't run on most distros and isn't a release artifact.
+- `build.yml` uploads `FinBro_Larper-Windows.exe` and `FinBro_Larper-Linux.tar.gz` (the executable plus `LICENSE`, as a tarball because artifact uploads drop the executable bit). README and CHANGELOG use those names. A `v*` tag push adds a job that creates a **draft** release with both files, `SHA256SUMS.txt` and the tag's `## vX.Y.Z` section of `CHANGELOG.md`; the job fails if that section is missing.
+- To verify a build: `venv/bin/python tests/smoke_executable.py dist/FinBro_Larper`. It runs the build from a temp directory, fetches the page and its vendored scripts, places a trade over `/ws`, and checks that Ctrl+C deletes the temp DB (POSIX only). CI runs it on each OS.
 
 ### Tests
 
@@ -30,7 +33,7 @@ venv/bin/pytest                                    # full suite, about 35 s
 venv/bin/pytest tests/test_engine.py -k fractional # one file / matching tests
 ```
 
-The tests are pytest and live in `tests/`; `pytest.ini` puts the project root and `tests/` on the path. `conftest.py` sets `PRO_TRADER_SIM_DB` to a temp file *before* app modules are imported, so tests never touch `simulator.db`. The test files:
+The tests are pytest and live in `tests/`; `pytest.ini` puts the project root and `tests/` on the path. `conftest.py` sets `FINBRO_LARPER_DB` to a temp file *before* app modules are imported, so tests never touch `simulator.db`. The test files:
 
 - `test_orderbook.py`: matching rules (pure).
 - `test_engine.py`: `Game` in-process, covering orders, reservations, fractional crypto, news, clock and seeds.
@@ -38,13 +41,13 @@ The tests are pytest and live in `tests/`; `pytest.ini` puts the project root an
 - `test_protocol.py` and `test_frozen_client.py`: a real uvicorn subprocess per module (`server` fixture) or per test (`server_factory`), driven over `/ws` with `wsutil.py` helpers. Every wait has a timeout. Reset shared-server state with `wsutil.fresh_game()`, which sends `NEW_GAME` with `running: false` so the week is exactly reproducible.
 - `test_page.py`: runs `tests/page_harness.js` in Node 22+. It executes the real inline script of `static/index.html` with stubbed DOM and chart libraries against a fresh server, and drives clicks and shortcuts. It's skipped without Node. When the page gains UI behavior, extend this harness.
 
-CI: `.github/workflows/tests.yml` runs on every push and PR; `build.yml` runs the suite on each OS before building.
+CI: `.github/workflows/tests.yml` runs on every push and PR (Ubuntu, Python 3.14, Node 22); `build.yml` runs the suite on each OS before building.
 
 For calibration work beyond the bounds in `test_market_behaviour.py`, run full weeks headlessly and compare price vs. `market.true_value`, realized volatility vs. `Profile.daily_vol`, spreads, and book depth. A tick costs well under 1 ms of the 100 ms budget.
 
 ## Architecture
 
-A single-player, 7-day trading game. `stock_market_simulator.html` is the original client-only draft (reference only, not served). The server is authoritative; the browser renders what it receives.
+A single-player, 7-day trading game. The server is authoritative; the browser renders what it receives.
 
 - `config.py` — constants and static data: timing (1 tick = 100 ms, 25 ticks = 1 in-game hour = 1 candle, 600 ticks = 1 day, 4200 ticks = the week), assets with their price `tick` and quantity `qty_step` (1 for shares; 0.0001 BTC, 0.001 ETH), per-asset-class `Profile`s, and `NEWS_DB`.
 - `orderbook.py` — a limit order book with price-time priority. Prices are integer ticks. A fill is always at the resting (maker) order's price.
@@ -117,4 +120,6 @@ All messages are JSON objects.
 
 - JS libraries are vendored, pinned files in `static/vendor/`; upgrade by replacing the file and its `<script>` tag. Lightweight Charts is 5.3.0 and the code uses the v5 API (`chart.addSeries(LightweightCharts.CandlestickSeries | HistogramSeries, ...)`). An unpinned CDN URL once pulled v5 under v4 code; the resulting error stopped the page before the WebSocket connected, so Play silently did nothing.
 - The venv runs Python 3.14, so pinned deps must support it. SQLAlchemy 2.0.20 failed at import (`AssertionError: ... directly inherits TypingOnly but has additional attributes {'__firstlineno__', '__static_attributes__'}`); 2.0.57 works.
-- `PROJECT_MEMORY.md` is the handoff summary for Claude sessions outside Claude Code: decisions and why, history, user preferences, open items. When features change, update it along with `README.md` and `implemented_features.md`. `chat_memory.md` (an early debugging chat) and `stock_market_simulator.html` (the original draft) are historical and don't describe the current code.
+- `PROJECT_MEMORY.md` is the handoff summary for Claude sessions outside Claude Code: decisions and why, history, user preferences, open items. When features change, update it along with `README.md` and `implemented_features.md`.
+- This repo is the only working copy. The project's earlier home, `~/Downloads/StockMarketSim/` (with `stock_simulator/`, `ideas.md`, `chat_memory.md` and the original draft `stock_market_simulator.html`), is no longer in use. Don't read from it or sync with it. Mentions of those files in `PROJECT_MEMORY.md` and `implemented_features.md` are stale.
+- The game is named FinBro_Larper everywhere: page title and header, launcher, executable (`FinBro_Larper`), spec, env var (`FINBRO_LARPER_DB`), temp files and logger. Until 2026-11-12 it was "Pro Trader Sim" (`ProTraderSim`, `PRO_TRADER_SIM_DB`), so any of those names still around are leftovers.

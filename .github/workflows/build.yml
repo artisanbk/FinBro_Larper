@@ -1,0 +1,83 @@
+# Builds the single-file executables (PyInstaller can't cross-compile, so each OS builds its own).
+# Run it from the Actions tab, or push a version tag (git tag v1.0.0 && git push origin v1.0.0):
+# a tag also creates a draft GitHub release with the files, SHA256SUMS.txt and the tag's
+# CHANGELOG.md section. Review the draft and publish it from the Releases page.
+name: Build executables
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # The oldest supported runner, because the binary needs this glibc (2.35) or newer.
+          - os: ubuntu-22.04
+            platform: Linux
+          - os: windows-latest
+            platform: Windows
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.14"
+          cache: pip
+          cache-dependency-path: requirements*.txt
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+      - run: pip install -r requirements.txt -r requirements-dev.txt -r requirements-build.txt
+      - run: pytest
+      - run: pyinstaller --noconfirm --clean finbro_larper.spec
+      - name: Smoke-test the executable
+        shell: bash
+        run: python tests/smoke_executable.py dist/FinBro_Larper${{ runner.os == 'Windows' && '.exe' || '' }}
+      # Artifact uploads drop the executable bit, so Linux ships as a tarball. README.md uses these names.
+      - name: Package
+        shell: bash
+        run: |
+          mkdir release
+          if [ "$RUNNER_OS" = Windows ]; then
+            cp dist/FinBro_Larper.exe release/FinBro_Larper-Windows.exe
+          else
+            tar -czf release/FinBro_Larper-${{ matrix.platform }}.tar.gz -C dist FinBro_Larper -C .. LICENSE
+          fi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: FinBro_Larper-${{ matrix.platform }}
+          path: release/*
+          if-no-files-found: error
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/download-artifact@v4
+        with:
+          path: release
+          merge-multiple: true
+      - name: Checksums
+        working-directory: release
+        run: sha256sum * > SHA256SUMS.txt && cat SHA256SUMS.txt
+      - name: Release notes from CHANGELOG.md
+        run: |
+          awk -v tag="$GITHUB_REF_NAME" '$0 ~ "^## " tag "( |$)" {found=1; next} found && /^## / {exit} found' CHANGELOG.md > notes.md
+          test -s notes.md || { echo "CHANGELOG.md has no '## $GITHUB_REF_NAME' section"; exit 1; }
+      - name: Create the draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >
+          gh release create "$GITHUB_REF_NAME" release/*
+          --draft --verify-tag --title "FinBro_Larper $GITHUB_REF_NAME" --notes-file notes.md

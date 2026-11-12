@@ -1,6 +1,6 @@
 # Chat Memory: Implemented Features
 
-This document tracks the functionality built into the Stock Market Simulator. Everything from the original client-only draft (`stock_market_simulator.html`) has been ported to a server-authoritative design: the game runs on the server, and the browser renders what it receives over the `/ws` WebSocket. Prices come from an agent-based market rather than a random walk.
+This document tracks the functionality built into FinBro_Larper. Everything from the original client-only draft (`stock_market_simulator.html`) has been ported to a server-authoritative design: the game runs on the server, and the browser renders what it receives over the `/ws` WebSocket. Prices come from an agent-based market rather than a random walk.
 
 ## Backend (FastAPI & Python)
 
@@ -37,11 +37,12 @@ This document tracks the functionality built into the Stock Market Simulator. Ev
 
 ## Packaging
 
-* **Single-file executable (PyInstaller):** `ProTraderSim` / `ProTraderSim.exe` needs no Python or internet.
+* **Single-file executable (PyInstaller):** `FinBro_Larper` / `FinBro_Larper.exe` needs no Python or internet.
   * It starts the server on port 8000 (or any free port) and opens the browser.
   * It uses a temporary database that's deleted on exit.
 * **Offline page:** Tailwind, Chart.js and Lightweight Charts are bundled in `static/vendor/` instead of loaded from CDNs.
-* **Cross-platform builds:** a GitHub Actions workflow builds and smoke-tests Linux, Windows and macOS executables.
+* **Cross-platform builds:** a GitHub Actions workflow builds and smoke-tests the Linux (Ubuntu 22.04, for glibc 2.35+) and Windows executables.
+  * A version tag also creates a draft GitHub release with both files, SHA256 checksums and that version's `CHANGELOG.md` notes.
 
 ## Tests
 

@@ -6,13 +6,13 @@ from pathlib import Path
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, declarative_base
 
-if os.environ.get("PRO_TRADER_SIM_DB"):
+if os.environ.get("FINBRO_LARPER_DB"):
     # Override, used by the test suite so it never touches the real database.
-    DB_PATH = Path(os.environ["PRO_TRADER_SIM_DB"])
+    DB_PATH = Path(os.environ["FINBRO_LARPER_DB"])
 elif getattr(sys, "frozen", False):
     # Packaged app: its folder may be read-only, and every start is a fresh week anyway, so use a
     # per-process file in the temp folder (two running copies can't wipe each other). run.py deletes it on exit.
-    DB_PATH = Path(tempfile.gettempdir()) / f"pro_trader_sim_{os.getpid()}.db"
+    DB_PATH = Path(tempfile.gettempdir()) / f"finbro_larper_{os.getpid()}.db"
 else:
     # Anchored to this file so the app works no matter which directory it's launched from.
     DB_PATH = Path(__file__).resolve().parent / "simulator.db"

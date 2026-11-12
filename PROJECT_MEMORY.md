@@ -1,4 +1,4 @@
-# Project Memory: Pro Trader Sim
+# Project Memory: FinBro_Larper
 
 Handoff notes for future Claude sessions (Claude Code, desktop or web). Last updated 2026-11-12.
 Detailed architecture and invariants are in `CLAUDE.md`. The feature list is in `implemented_features.md`, and running, testing and building are in `README.md`.
@@ -16,8 +16,9 @@ A single-player, 7-day stock market trading game.
   - Everything from the original client-only draft (`stock_market_simulator.html`): 8 assets in 5 classes, the 7-day clock, news, the end-of-week report and Play Again.
   - The agent market with real order books. Orders support market/limit, partial fills, reserved cash and holdings, self-trade prevention, a $5 per-order fee, and fractional crypto.
   - **Page:** order book panel, live tape of real trades, volume bars, Portfolio panel, fill toasts with a chime, and keyboard shortcuts.
-  - **Packaging and tests:** offline vendored JS, the PyInstaller build, a 55-test pytest suite, and GitHub workflows for tests and builds.
-- **Not a git repository yet.** The GitHub workflows (`tests.yml`, `build.yml`) have never run. The files to commit are everything not in `.gitignore`.
+  - **Packaging and tests:** offline vendored JS, the PyInstaller build, a 55-test pytest suite, a build smoke test (`tests/smoke_executable.py`), and GitHub workflows for tests, builds and draft releases.
+- **Git:** public repo at `github.com/artisanbk/FinBro_Larper`. The workflows were recreated on 2026-11-12 and haven't run on GitHub yet. A local Linux build passes the smoke test.
+- **Release prep:** `CHANGELOG.md` has the v1.0.0 notes. Pushing tag `v1.0.0` builds Linux and Windows and creates a draft release to review and publish.
 - **Never checked in a real browser by Claude:** the development environment had none. UI behaviour is verified by `tests/page_harness.js`, which runs the page's real script in Node with stubbed DOM and charts. Layout and visuals are unverified.
 
 ## Key decisions and why
@@ -44,6 +45,8 @@ A single-player, 7-day stock market trading game.
 8. **Keyboard shortcuts:** Space, 1–5, Tab, Esc, `` ` ``, `\`, Shift+Enter, N.
 9. **Packaging:** vendored libs, the `run.py` launcher, the PyInstaller spec and the cross-platform build workflow.
 10. **pytest suite and CI:** `NEW_GAME` accepts `running: false`, so seeded weeks replay exactly.
+11. **Renamed to FinBro_Larper (2026-11-12):** previously "Pro Trader Sim". This covers the page, launcher, executable, spec file (`finbro_larper.spec`), the DB env var (`FINBRO_LARPER_DB`) and the docs.
+12. **Release prep (2026-11-12):** `.gitignore` re-includes the spec and ignores `simulator.db`. The build workflow targets Linux (Ubuntu 22.04) and Windows only and ends with a draft release. Added `CHANGELOG.md` and the build smoke test.
 
 ## User preferences and working style
 
@@ -55,7 +58,7 @@ A single-player, 7-day stock market trading game.
 ## Open items and ideas
 
 - **Volatility:** quiet-period volatility is about 65–80% of target. Raising `config.PROFILES[...].daily_vol` would close the gap.
-- **Builds:** the workflows are untested. The macOS build is Apple Silicon only, and the executables are unsigned, so macOS and Windows warn on first launch.
+- **Builds:** the workflows are untested on GitHub. There's no macOS build (the user asked for Linux and Windows). The executables are unsigned, so Windows SmartScreen warns on first launch.
 - **One game per server:** everyone who connects shares the same week. That only matters if it's ever hosted for multiple players.
 - **Unread ideas file:** `../ideas.md`, outside the project folder, holds the user's original ideas. Claude Code couldn't read it because reads outside the working directory are blocked; `/add-dir ..` allows it.
 - **Historical files:** `chat_memory.md` holds notes from an early debugging chat and `stock_market_simulator.html` is the original draft. Neither describes the current code.

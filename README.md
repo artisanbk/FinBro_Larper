@@ -1,4 +1,4 @@
-# Pro Trader Sim
+# FinBro_Larper
 
 A 7-day stock market trading game. You start with $10,000 and trade stocks, ETFs, crypto, REITs and bonds in a market full of simulated traders, then see how you did when the week ends.
 
@@ -10,24 +10,22 @@ The game is a single file per operating system. You don't need Python or an inte
 
 | System | File |
 |---|---|
-| Windows | `ProTraderSim-Windows.exe` |
-| macOS (Apple Silicon) | `ProTraderSim-macOS.tar.gz` |
-| Linux | `ProTraderSim-Linux.tar.gz` |
+| Windows | `FinBro_Larper-Windows.exe` |
+| Linux (glibc 2.35+: Ubuntu 22.04, Debian 12, Fedora 36 or newer) | `FinBro_Larper-Linux.tar.gz` |
 
-Download it from the latest **Build executables** run in the repository's Actions tab (under *Artifacts*), or build it yourself (see [Build the executable](#build-the-executable)). On macOS and Linux, extract it first: `tar -xzf ProTraderSim-macOS.tar.gz`.
+Download it from the [Releases page](https://github.com/artisanbk/FinBro_Larper/releases). `SHA256SUMS.txt` there lists the files' checksums. On Linux, extract it first: `tar -xzf FinBro_Larper-Linux.tar.gz`. There's no macOS download; on a Mac, build it yourself (see [Build the executable](#build-the-executable)).
 
 ### Launch
 
-- **Windows:** double-click `ProTraderSim-Windows.exe`.
-- **macOS / Linux:** run `./ProTraderSim` in a terminal (or double-click it).
+- **Windows:** double-click `FinBro_Larper-Windows.exe`.
+- **Linux (or a macOS build):** run `./FinBro_Larper` in a terminal (or double-click it).
 
 A small window shows the game's address, and your browser opens the game. Press **Play** (▶) or Space to start the market. To quit, close that window or press `Ctrl+C` in it.
 
 **The first time:**
-- **macOS:** the app isn't signed, so macOS blocks it. Right-click it and choose **Open**, or run `xattr -d com.apple.quarantine ProTraderSim`.
 - **Windows:** SmartScreen may warn about an unknown app; choose **More info → Run anyway**. Some antivirus tools flag single-file Python apps; that's a known false positive.
 
-**Options:** the game uses port 8000, or any free port if that's taken. Run `ProTraderSim --port 8001` to choose one, or `--no-browser` to skip opening the browser and open the shown address yourself.
+**Options:** the game uses port 8000, or any free port if that's taken. Run `FinBro_Larper --port 8001` to choose one, or `--no-browser` to skip opening the browser and open the shown address yourself.
 
 ### How to play
 
@@ -58,7 +56,7 @@ While you're typing in the quantity or limit field, digits type as normal; the o
 
 ### Set up
 
-Requires Python 3.10 or newer (the project is developed on 3.14). Run everything from the `stock_simulator` folder. The commands below are for Linux/macOS; on Windows use `py` instead of `python3` and `venv\Scripts\` instead of `venv/bin/`.
+Requires Python 3.10 or newer (the project is developed on 3.14). Run everything from the project folder (`FinBro_Larper`). The commands below are for Linux/macOS; on Windows use `py` instead of `python3` and `venv\Scripts\` instead of `venv/bin/`.
 
 ```sh
 python3 -m venv venv
@@ -92,7 +90,7 @@ venv/bin/pytest -k fractional            # tests whose name matches
 | `test_protocol.py`, `test_frozen_client.py` | The WebSocket protocol against a real server, including a frozen-tab regression |
 | `test_page.py` | The page's JavaScript, driven in Node (needs Node 22+; skipped otherwise) |
 
-The tests use their own temporary databases and never touch `simulator.db`. On GitHub, the suite runs on every push (`tests.yml`) and again on each OS before building (`build.yml`).
+The tests use their own temporary databases and never touch `simulator.db`. On GitHub, the suite runs on every push and pull request (`tests.yml`), and again on each OS before building (`build.yml`).
 
 ### Build the executable
 
@@ -100,12 +98,21 @@ PyInstaller can't cross-compile, so build on each OS you want to ship for:
 
 ```sh
 venv/bin/pip install -r requirements-build.txt
-venv/bin/pyinstaller --noconfirm --clean pro_trader_sim.spec
+venv/bin/pyinstaller --noconfirm --clean finbro_larper.spec
 ```
 
-The result is `dist/ProTraderSim` (`dist\ProTraderSim.exe` on Windows), a single file of about 25 MB. Check it with `dist/ProTraderSim --no-browser`.
+The result is `dist/FinBro_Larper` (`dist\FinBro_Larper.exe` on Windows), a single file of about 25 MB. To check it, run `venv/bin/python tests/smoke_executable.py dist/FinBro_Larper`. That starts it from another folder, checks the bundled page, places a trade over the WebSocket, and quits it.
 
-To build all three platforms without three machines, push the project to GitHub. Then run **Build executables** (`.github/workflows/build.yml`) from the Actions tab, or push a tag like `v1.0`. It runs the tests, builds and smoke-tests on Linux, Windows and macOS, and attaches the files listed under [Get the game](#get-the-game) to the run.
+A Linux build only runs on systems with the same glibc as the build machine or newer. That's why release builds come from GitHub Actions' Ubuntu 22.04 runner and not from a rolling distro.
+
+To build for Linux and Windows without a Windows machine, run **Build executables** (`.github/workflows/build.yml`) from the repository's Actions tab. It runs the tests, builds and smoke-tests on each OS, and attaches the files listed under [Get the game](#get-the-game) to the run. For macOS, add `macos-latest` (an Apple Silicon build) to its matrix.
+
+### Release
+
+1. Add a `## vX.Y.Z (date)` section to `CHANGELOG.md`. It becomes the release notes.
+2. Commit it, then tag and push: `git tag v1.0.0 && git push origin main v1.0.0`.
+3. The tag runs **Build executables**. It ends by creating a **draft** release with both files, `SHA256SUMS.txt` and that changelog section.
+4. Check the draft on the Releases page and publish it.
 
 ### Project layout
 
@@ -118,5 +125,8 @@ To build all three platforms without three machines, push the project to GitHub.
 | `config.py` | Assets, fees, timing, news and market tuning |
 | `models.py`, `database.py` | SQLite tables and connection |
 | `static/` | The game page; its libraries are bundled in `static/vendor/` so it works offline |
-| `pro_trader_sim.spec` | PyInstaller build recipe |
+| `finbro_larper.spec` | PyInstaller build recipe |
+| `tests/smoke_executable.py` | Smoke test for a built executable |
+| `.github/workflows/` | CI: `tests.yml` (every push) and `build.yml` (executables and draft releases) |
+| `CHANGELOG.md` | Release notes, one section per version |
 | `CLAUDE.md` | Architecture notes and invariants |

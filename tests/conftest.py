@@ -19,8 +19,8 @@ from pathlib import Path
 import pytest
 
 ROOT = Path(__file__).resolve().parent.parent
-TMP = Path(tempfile.mkdtemp(prefix="pro_trader_sim_tests_"))
-os.environ["PRO_TRADER_SIM_DB"] = str(TMP / "engine.db")
+TMP = Path(tempfile.mkdtemp(prefix="finbro_larper_tests_"))
+os.environ["FINBRO_LARPER_DB"] = str(TMP / "engine.db")
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -54,7 +54,7 @@ class LiveServer:
 def run_server(*uvicorn_args: str):
     """Start `uvicorn main:app` on a free port with its own database; stop it afterwards."""
     port = free_port()
-    env = {**os.environ, "PRO_TRADER_SIM_DB": str(TMP / f"server_{port}.db")}
+    env = {**os.environ, "FINBRO_LARPER_DB": str(TMP / f"server_{port}.db")}
     log = open(TMP / f"server_{port}.log", "w+")
     process = subprocess.Popen(
         [sys.executable, "-m", "uvicorn", "main:app", "--port", str(port), "--log-level", "warning", *uvicorn_args],
