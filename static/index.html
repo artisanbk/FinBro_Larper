@@ -1,0 +1,1157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pro Trader Sim</title>
+    <script src="vendor/tailwind-3.4.17.js"></script>
+    <script src="vendor/chart-4.4.1.umd.min.js"></script>
+    <script src="vendor/lightweight-charts-5.3.0.standalone.production.js"></script>
+    <style>
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: #0f172a; }
+        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #475569; }
+        body { font-family: 'Inter', sans-serif; }
+
+        @keyframes marquee {
+            0% { transform: translateX(100%); }
+            100% { transform: translateX(-100%); }
+        }
+        .animate-marquee { animation: marquee 15s linear infinite; }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen p-4 md:p-6 flex flex-col">
+
+    <!-- Header Controls -->
+    <header class="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 gap-4 bg-slate-900 p-4 rounded-xl border border-slate-800 shadow-lg relative z-20">
+        <div class="flex flex-col gap-2">
+            <h1 class="text-2xl font-black bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-indigo-500">
+                PRO TRADER SIM
+            </h1>
+            <div class="flex items-center gap-3 bg-slate-950 px-3 py-1.5 rounded-lg border border-slate-800">
+                <div class="text-slate-400 font-mono text-sm" id="clock-display">Connecting…</div>
+                <div class="w-px h-4 bg-slate-700"></div>
+                <button onclick="togglePlay()" id="btn-play-pause" title="Play" class="text-slate-300 hover:text-white transition-colors disabled:opacity-40 disabled:cursor-not-allowed" disabled></button>
+                <span id="status-pill" class="text-xs font-semibold uppercase tracking-wider text-slate-500">Connecting</span>
+                <button onclick="toggleSound()" id="btn-sound" title="Fill sound: on" class="text-slate-400 hover:text-white transition-colors"></button>
+                <span title="Keyboard shortcuts&#10;Space: play / pause&#10;1-5: Stocks, ETFs, Crypto, REITs, Bonds&#10;Tab: quantity / limit price (value selected)&#10;Esc: leave the field (back to shortcuts)&#10;`: switch buy / sell&#10;\: switch market / limit&#10;Shift+Enter: execute the order&#10;N: open / close the news" class="text-slate-500 hover:text-slate-300 cursor-help" aria-label="Keyboard shortcuts">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="2" y="6" width="20" height="12" rx="2"/><path stroke-linecap="round" d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M7 14h10"/></svg>
+                </span>
+                <div class="w-px h-4 bg-slate-700"></div>
+                <button onclick="fastForward()" id="btn-fast-forward" class="text-amber-400 hover:text-amber-300 transition-colors flex items-center gap-1 text-sm font-bold disabled:opacity-40 disabled:cursor-not-allowed" disabled>
+                    <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM7.029 6.029a1 1 0 00-1.029.029v7.94a1 1 0 001.55.83l5-3.97a1 1 0 000-1.658l-5-3.97a1 1 0 00-.521-.2z" clip-rule="evenodd"></path></svg>
+                    End Day 7
+                </button>
+            </div>
+        </div>
+
+        <div class="flex flex-wrap gap-4 md:gap-8">
+            <div class="bg-slate-950 px-4 py-3 rounded-lg border border-slate-800">
+                <div class="text-slate-400 text-xs font-semibold uppercase tracking-wider mb-1">Total Net Worth</div>
+                <div id="net-worth-display" class="text-2xl font-bold">$0.00</div>
+            </div>
+            <div class="bg-slate-950 px-4 py-3 rounded-lg border border-slate-800">
+                <div class="text-slate-400 text-xs font-semibold uppercase tracking-wider mb-1">Available Cash</div>
+                <div id="cash-display" class="text-2xl font-bold text-blue-400">$0.00</div>
+                <div id="reserved-display" class="text-xs text-slate-500 hidden"></div>
+            </div>
+            <div class="bg-slate-950 px-4 py-3 rounded-lg border border-slate-800">
+                <div class="text-slate-400 text-xs font-semibold uppercase tracking-wider mb-1">Fees Paid</div>
+                <div id="fees-display" class="text-2xl font-bold text-red-400">$0.00</div>
+            </div>
+        </div>
+    </header>
+
+    <!-- News Ticker -->
+    <div id="news-ticker-container" class="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-lg flex items-center mb-4">
+        <div id="news-header-tab" class="bg-slate-700 text-white text-xs font-bold px-4 py-2 uppercase tracking-wider whitespace-nowrap z-10">News</div>
+        <div class="flex-1 overflow-hidden relative h-10 flex items-center bg-slate-950/50">
+            <div id="news-ticker" title="Open the news (N)" class="absolute whitespace-nowrap text-sm font-medium px-4 transition-colors text-slate-500" onclick="openNewsModal()">
+                No breaking news. Markets are trading normally.
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Layout -->
+    <div class="flex-1 grid grid-cols-1 lg:grid-cols-4 lg:items-start gap-6 min-h-0">
+
+        <!-- Left Area (Chart & Orders) -->
+        <div class="lg:col-span-3 lg:self-stretch flex flex-col gap-6">
+
+            <!-- Asset Tabs -->
+            <div class="bg-slate-900 rounded-xl border border-slate-800 p-2 flex flex-wrap gap-2">
+                <button onclick="switchTab('STOCK')" id="tab-STOCK" title="Stocks (1)" class="px-4 py-2 rounded-lg text-sm font-bold bg-blue-600 text-white transition-colors">Stocks</button>
+                <button onclick="switchTab('ETF')" id="tab-ETF" title="ETFs (2)" class="px-4 py-2 rounded-lg text-sm font-bold text-slate-400 hover:bg-slate-800 transition-colors">ETFs</button>
+                <button onclick="switchTab('CRYPTO')" id="tab-CRYPTO" title="Crypto (3)" class="px-4 py-2 rounded-lg text-sm font-bold text-slate-400 hover:bg-slate-800 transition-colors">Crypto</button>
+                <button onclick="switchTab('REIT')" id="tab-REIT" title="REITs (4)" class="px-4 py-2 rounded-lg text-sm font-bold text-slate-400 hover:bg-slate-800 transition-colors">REITs</button>
+                <button onclick="switchTab('BOND')" id="tab-BOND" title="Bonds (5)" class="px-4 py-2 rounded-lg text-sm font-bold text-slate-400 hover:bg-slate-800 transition-colors">Bonds</button>
+            </div>
+
+            <!-- Candlestick Chart Area -->
+            <div class="bg-slate-900 rounded-xl border border-slate-800 p-4 shadow-lg h-[60vh] min-h-[420px] flex flex-col">
+                <div class="mb-2">
+                    <h2 class="text-2xl font-bold flex items-center gap-3">
+                        <span id="chart-symbol">—</span>
+                        <span id="chart-price" class="text-slate-300 text-lg font-normal"></span>
+                    </h2>
+                    <div id="chart-desc" class="text-sm text-slate-400">&nbsp;</div>
+                </div>
+                <!-- The chart sits in an absolutely positioned layer so its canvas can't grow the container -->
+                <div class="flex-1 min-h-0 w-full bg-slate-950 rounded-lg overflow-hidden border border-slate-800 relative">
+                    <div id="tv-chart" class="absolute inset-0"></div>
+                </div>
+            </div>
+
+            <!-- Asset List, Pending Orders & News -->
+            <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                <div class="bg-slate-900 rounded-xl border border-slate-800 p-4 shadow-lg h-64 overflow-y-auto">
+                    <h3 class="font-bold text-lg mb-3 text-slate-300 border-b border-slate-800 pb-2">Market Watch</h3>
+                    <div id="market-list" class="space-y-2"></div>
+                </div>
+
+                <div class="bg-slate-900 rounded-xl border border-slate-800 p-4 shadow-lg h-64 overflow-y-auto">
+                    <h3 class="font-bold text-lg mb-3 text-slate-300 border-b border-slate-800 pb-2">Pending Limit Orders</h3>
+                    <div id="limit-order-list" class="space-y-2">
+                        <div class="text-slate-500 text-sm italic">No pending orders.</div>
+                    </div>
+                </div>
+
+                <div class="bg-slate-900 rounded-xl border border-slate-800 p-4 shadow-lg h-64 overflow-y-auto md:col-span-2 xl:col-span-1">
+                    <h3 class="font-bold text-lg mb-3 text-slate-300 border-b border-slate-800 pb-2 flex justify-between items-center">
+                        Market News <span id="news-count" class="text-xs font-normal text-slate-500"></span>
+                    </h3>
+                    <div id="news-log" class="space-y-2"></div>
+                </div>
+            </div>
+
+            <!-- Portfolio: fills the rest of the column -->
+            <div class="bg-slate-900 rounded-xl border border-slate-800 p-4 shadow-lg flex-1 min-h-[16rem] flex flex-col">
+                <h3 class="font-bold text-lg mb-3 text-slate-300 border-b border-slate-800 pb-2 flex flex-wrap justify-between items-baseline gap-2">
+                    Portfolio <span id="portfolio-summary" class="text-xs font-normal text-slate-400"></span>
+                </h3>
+                <div id="portfolio-list" class="flex-1 min-h-0 overflow-y-auto"></div>
+            </div>
+        </div>
+
+        <!-- Right Area (Trade Panel & Tape) -->
+        <div class="flex flex-col gap-6">
+
+            <!-- Trade Panel -->
+            <div class="bg-slate-900 rounded-xl border border-slate-800 p-5 shadow-lg relative overflow-hidden">
+                <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-500 to-indigo-500"></div>
+                <h3 class="font-bold text-lg mb-4">Trade Order: <span id="trade-symbol" class="text-blue-400"></span></h3>
+
+                <div class="flex bg-slate-950 rounded-lg p-1 mb-4 border border-slate-800">
+                    <button onclick="setTradeMode('BUY')" id="mode-buy" title="Buy (` switches)" class="flex-1 py-1.5 rounded-md text-sm font-bold bg-green-600/20 text-green-400">BUY</button>
+                    <button onclick="setTradeMode('SELL')" id="mode-sell" title="Sell (` switches)" class="flex-1 py-1.5 rounded-md text-sm font-bold text-slate-400 hover:text-white">SELL</button>
+                </div>
+
+                <div class="space-y-4">
+                    <div>
+                        <label for="order-type" class="block text-xs font-semibold text-slate-400 uppercase mb-1">Order Type</label>
+                        <select id="order-type" onchange="toggleLimitInput()" title="\ switches market / limit" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500">
+                            <option value="MARKET">Market Order</option>
+                            <option value="LIMIT">Limit Order</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <div class="flex justify-between items-baseline mb-1">
+                            <label for="trade-amount" id="trade-amount-label" class="block text-xs font-semibold text-slate-400 uppercase">Shares</label>
+                            <button type="button" onclick="fillMax()" class="text-xs font-semibold text-blue-400 hover:text-blue-300">Max</button>
+                        </div>
+                        <input type="number" id="trade-amount" value="1" min="1" step="1" oninput="updateOrderPreview()" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500">
+                        <div id="trade-available" class="text-xs text-slate-500 mt-1"></div>
+                    </div>
+
+                    <div id="limit-price-container" class="hidden">
+                        <label for="limit-price" class="block text-xs font-semibold text-slate-400 uppercase mb-1">Limit Price</label>
+                        <input type="number" id="limit-price" placeholder="0.00" min="0" step="0.01" oninput="updateOrderPreview()" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500">
+                    </div>
+                </div>
+
+                <div class="mt-6 p-3 bg-slate-950 rounded-lg border border-slate-800 text-sm space-y-2">
+                    <div class="flex justify-between text-slate-400">
+                        <span id="preview-avg-label">Est. Avg Price</span>
+                        <span id="preview-avg" class="text-right">—</span>
+                    </div>
+                    <div class="flex justify-between text-slate-400">
+                        <span id="preview-principal-label">Est. Principal</span>
+                        <span id="preview-principal">$0.00</span>
+                    </div>
+                    <div class="flex justify-between text-slate-400">
+                        <span>Fee (per order)</span>
+                        <span id="preview-fee">$0.00</span>
+                    </div>
+                    <div class="flex justify-between font-bold border-t border-slate-800 pt-2 mt-2" id="preview-total-container">
+                        <span>Total Cost</span>
+                        <span id="preview-total" class="text-white">$0.00</span>
+                    </div>
+                    <div id="preview-warning" class="text-xs text-amber-400 hidden"></div>
+                </div>
+
+                <button id="btn-execute-trade" onclick="executeTrade()" title="Shift+Enter" class="w-full mt-4 py-3 rounded-lg font-bold text-lg transition-all shadow-lg active:scale-95 bg-green-600 hover:bg-green-500 text-white">
+                    Execute BUY
+                </button>
+                <p id="order-status" class="mt-3 text-sm min-h-[1.25rem]" role="status"></p>
+            </div>
+
+            <!-- Order Book -->
+            <div class="bg-slate-900 rounded-xl border border-slate-800 p-5 shadow-lg">
+                <h3 class="font-bold text-lg mb-2 flex items-center justify-between border-b border-slate-800 pb-2">
+                    Order Book <span id="book-symbol" class="text-xs font-normal text-slate-400 bg-slate-950 px-2 py-1 rounded"></span>
+                </h3>
+                <div class="grid grid-cols-3 text-xs text-slate-500 uppercase tracking-wider px-1 mb-1">
+                    <span>Price</span><span class="text-right">Size</span><span class="text-right">Yours</span>
+                </div>
+                <div id="book-asks" class="h-40 flex flex-col justify-end font-mono text-sm"></div>
+                <div id="book-spread" class="text-xs text-slate-400 text-center py-1 my-1 border-y border-slate-800">—</div>
+                <div id="book-bids" class="h-40 font-mono text-sm"></div>
+            </div>
+
+            <!-- Live Trade Tape -->
+            <div class="bg-slate-900 rounded-xl border border-slate-800 p-5 shadow-lg h-72 flex flex-col">
+                <h3 class="font-bold text-lg mb-1 flex items-center justify-between border-b border-slate-800 pb-2">
+                    Live Tape <span id="tape-symbol" class="text-xs font-normal text-slate-400 bg-slate-950 px-2 py-1 rounded"></span>
+                </h3>
+                <p class="text-xs text-slate-500 mb-1">Every trade, colored by the side that crossed the spread.</p>
+                <div id="trade-tape" class="flex-1 min-h-0 overflow-y-auto pr-1 space-y-1.5 text-sm font-mono flex flex-col pt-1"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Fill notifications: small, auto-dismissing, click-through -->
+    <div id="toasts" class="fixed bottom-4 right-4 z-40 flex flex-col items-end gap-2 pointer-events-none" aria-live="polite"></div>
+
+    <!-- News Modal -->
+    <div id="news-modal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 hidden items-center justify-center p-4">
+        <div class="bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl max-w-lg w-full overflow-hidden">
+            <div id="news-modal-header" class="bg-red-600 p-4">
+                <h2 class="text-xl font-bold text-white mb-1">Market Alert</h2>
+            </div>
+            <div class="p-6 space-y-4">
+                <h3 id="news-modal-headline" class="text-2xl font-bold text-white">Headline</h3>
+                <p id="news-modal-meta" class="text-xs font-semibold uppercase tracking-wider text-slate-400"></p>
+                <p id="news-modal-body" class="text-slate-300 text-sm leading-relaxed">Article body...</p>
+                <div class="pt-4 border-t border-slate-800 flex justify-end">
+                    <button id="btn-close-news" onclick="closeNewsModal()" class="px-6 py-2 rounded-lg font-bold bg-slate-700 hover:bg-slate-600 text-white transition-all">Close & Resume</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- End Game Modal -->
+    <div id="end-game-modal" class="fixed inset-0 bg-slate-950/90 backdrop-blur-md z-50 hidden items-center justify-center p-4">
+        <div class="bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl max-w-4xl w-full p-6 md:p-8 flex flex-col h-[90vh]">
+            <h2 class="text-3xl font-black mb-2 text-center">Day 7: Performance Report</h2>
+            <p class="text-slate-400 text-center mb-6">The trading week has concluded. Here is how you performed.</p>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                <div class="bg-slate-950 border border-slate-800 rounded-xl p-4 text-center">
+                    <div class="text-slate-400 text-xs font-bold uppercase mb-1">Final Net Worth</div>
+                    <div id="end-net-worth" class="text-3xl font-bold text-white">$0.00</div>
+                </div>
+                <div class="bg-slate-950 border border-slate-800 rounded-xl p-4 text-center">
+                    <div class="text-slate-400 text-xs font-bold uppercase mb-1">Total P/L</div>
+                    <div id="end-profit" class="text-3xl font-bold">$0.00</div>
+                </div>
+                <div class="bg-slate-950 border border-slate-800 rounded-xl p-4 text-center">
+                    <div class="text-slate-400 text-xs font-bold uppercase mb-1">Total Fees Paid</div>
+                    <div id="end-fees" class="text-3xl font-bold text-red-400">$0.00</div>
+                </div>
+            </div>
+
+            <div class="flex-1 min-h-0 bg-slate-950 rounded-xl border border-slate-800 p-4 mb-6 relative">
+                <canvas id="pnl-chart"></canvas>
+            </div>
+
+            <button onclick="newGame()" class="w-full md:w-auto md:mx-auto px-12 py-4 rounded-lg font-bold text-lg bg-blue-600 hover:bg-blue-500 text-white transition-all shadow-lg active:scale-95">
+                Play Again
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // The server (game.py) owns all game state: prices, clock, news, orders and the portfolio.
+        // This page renders what arrives over /ws and sends actions back.
+
+        const PLAY_ICON = '<svg class="w-5 h-5 text-green-400" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd"></path></svg>';
+        const PAUSE_ICON = '<svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zM7 8a1 1 0 012 0v4a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v4a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd"></path></svg>';
+        const TAPE_WAITING = '<div class="text-slate-500 text-center py-4 italic">Waiting for trades...</div>';
+        const TAB_TYPES = ['STOCK', 'ETF', 'CRYPTO', 'REIT', 'BOND'];
+        const TAPE_MAX_ROWS = 100;  // the tape scrolls, so keep more history
+        const BELL_ON = '<svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 17h5l-1.4-1.4A2 2 0 0118 14.2V11a6 6 0 10-12 0v3.2a2 2 0 01-.6 1.4L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/></svg>';
+        const BELL_OFF = '<svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 17h5l-1.4-1.4A2 2 0 0118 14.2V11a6 6 0 00-9.3-5M6 8.6V14.2a2 2 0 01-.6 1.4L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9M3 3l18 18"/></svg>';
+
+        const state = {
+            connected: false,
+            config: { fee: 0, starting_cash: 0 },
+            running: false,
+            ended: false,
+            assets: {},        // symbol -> { symbol, name, type, price, history: [candles...] }
+            symbols: [],       // display order
+            account: { cash: 0, fees_paid: 0, net_worth: 0, positions: [], orders: [] },
+            book: null,        // latest BOOK message for the selected asset
+            news: null,        // the active news-log entry, or null
+            newsLog: [],       // this week's headlines, oldest first
+            currentTab: 'STOCK',
+            selectedSymbol: null,
+            tradeMode: 'BUY',
+            resumeAfterNews: false,
+        };
+
+        let ws = null;
+        let reconnectDelay = 500;
+        let pnlChart = null;
+        let newsQuietTimer = null;
+        let orderStatusTimer = null;
+
+        // --- CHART ---
+        const tvChart = LightweightCharts.createChart(document.getElementById('tv-chart'), {
+            autoSize: true,
+            layout: { background: { type: 'solid', color: 'transparent' }, textColor: '#94a3b8' },
+            grid: { vertLines: { color: '#1e293b' }, horzLines: { color: '#1e293b' } },
+            timeScale: { timeVisible: true, secondsVisible: false },
+            crosshair: { mode: LightweightCharts.CrosshairMode.Normal },
+        });
+        const candleSeries = tvChart.addSeries(LightweightCharts.CandlestickSeries, {
+            upColor: '#22c55e', downColor: '#ef4444', borderVisible: false,
+            wickUpColor: '#22c55e', wickDownColor: '#ef4444',
+        });
+        candleSeries.priceScale().applyOptions({ scaleMargins: { top: 0.05, bottom: 0.25 } });
+        const volumeSeries = tvChart.addSeries(LightweightCharts.HistogramSeries, {
+            priceFormat: { type: 'volume' }, priceScaleId: 'volume', lastValueVisible: false, priceLineVisible: false,
+        });
+        tvChart.priceScale('volume').applyOptions({ scaleMargins: { top: 0.8, bottom: 0 } });
+        const volumeBar = (c) => ({
+            time: c.time, value: c.volume || 0,
+            color: c.close >= c.open ? 'rgba(34, 197, 94, 0.35)' : 'rgba(239, 68, 68, 0.35)',
+        });
+
+        // --- CONNECTION ---
+        function connect() {
+            const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+            ws = new WebSocket(`${proto}://${location.host}/ws`);
+            ws.onopen = () => {
+                reconnectDelay = 500;
+                state.connected = true;
+                renderStatus();
+            };
+            ws.onmessage = (event) => handleMessage(JSON.parse(event.data));
+            ws.onclose = () => {
+                state.connected = false;
+                renderStatus();
+                setTimeout(connect, reconnectDelay);
+                reconnectDelay = Math.min(reconnectDelay * 2, 5000);
+            };
+        }
+
+        function send(payload) {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify(payload));
+                return true;
+            }
+            showOrderStatus('Not connected to the server.', false);
+            return false;
+        }
+
+        function handleMessage(msg) {
+            switch (msg.type) {
+                case 'SNAPSHOT': applySnapshot(msg); break;
+                case 'TICK': applyTick(msg); break;
+                case 'BOOK':
+                    if (msg.symbol === state.selectedSymbol) {
+                        state.book = msg;
+                        renderBook();
+                        appendTrades(msg.trades);
+                        updateOrderPreview();
+                    }
+                    break;
+                case 'ACCOUNT': state.account = msg; renderAccount(); break;
+                case 'STATUS': state.running = msg.running; state.ended = msg.ended; renderStatus(); break;
+                case 'NEWS': applyNews(msg.news, msg.news_log, true); break;
+                case 'ORDER_RESULT':
+                    showOrderStatus(msg.message, msg.ok);
+                    if (msg.fill) notifyFill(msg.fill);
+                    break;
+                case 'FILL':
+                    showOrderStatus(msg.message, true);
+                    notifyFill(msg.fill);
+                    break;
+                case 'GAME_OVER': state.running = false; state.ended = true; renderStatus(); applyNews(null, state.newsLog, false); showEndGame(msg); break;
+                case 'ERROR': console.warn('Server error:', msg.message); break;
+            }
+        }
+
+        function applySnapshot(msg) {
+            state.config = msg.config;
+            state.running = msg.running;
+            state.ended = msg.ended;
+            state.account = msg.account;
+            state.assets = {};
+            state.symbols = [];
+            msg.assets.forEach(a => { state.assets[a.symbol] = a; state.symbols.push(a.symbol); });
+            if (!state.assets[state.selectedSymbol]) state.selectedSymbol = state.symbols[0];
+
+            document.getElementById('clock-display').textContent = msg.clock;
+            document.getElementById('preview-fee').textContent = formatMoney(state.config.fee);
+            switchTab(state.assets[state.selectedSymbol].type, state.selectedSymbol);
+            renderStatus();
+            renderAccount();
+            applyNews(msg.news, msg.news_log, false);
+            if (msg.report) showEndGame(msg.report); else hideEndGame();
+        }
+
+        function applyTick(msg) {
+            document.getElementById('clock-display').textContent = msg.clock;
+            for (const [sym, update] of Object.entries(msg.updates)) {
+                const asset = state.assets[sym];
+                if (!asset) continue;
+                asset.price = update.price;
+                const history = asset.history;
+                if (history.length && history[history.length - 1].time === update.candle.time) {
+                    history[history.length - 1] = update.candle;
+                } else {
+                    history.push(update.candle);
+                }
+                const priceEl = document.getElementById(`mw-price-${sym}`);
+                if (priceEl) priceEl.textContent = formatMoney(asset.price);
+                if (sym === state.selectedSymbol) {
+                    candleSeries.update(update.candle);
+                    volumeSeries.update(volumeBar(update.candle));
+                    document.getElementById('chart-price').textContent = formatMoney(asset.price);
+                }
+            }
+            state.account.net_worth = msg.net_worth;
+            renderHUD();
+            if (Object.keys(msg.updates).length) updatePortfolioValues();
+            if (msg.updates[state.selectedSymbol]) updateOrderPreview();
+        }
+
+        // --- MARKET VIEW ---
+        function switchTab(type, symbol) {
+            state.currentTab = type;
+            TAB_TYPES.forEach(t => {
+                document.getElementById(`tab-${t}`).className = t === type
+                    ? 'px-4 py-2 rounded-lg text-sm font-bold bg-blue-600 text-white transition-colors'
+                    : 'px-4 py-2 rounded-lg text-sm font-bold text-slate-400 hover:bg-slate-800 transition-colors';
+            });
+            const target = symbol || state.symbols.find(s => state.assets[s].type === type);
+            if (target) selectAsset(target);
+        }
+
+        function selectAsset(symbol) {
+            const asset = state.assets[symbol];
+            if (!asset) return;
+            state.selectedSymbol = symbol;
+            document.getElementById('chart-symbol').textContent = symbol;
+            document.getElementById('chart-price').textContent = formatMoney(asset.price);
+            document.getElementById('chart-desc').textContent = asset.name;
+            document.getElementById('trade-symbol').textContent = symbol;
+            document.getElementById('tape-symbol').textContent = symbol;
+            document.getElementById('book-symbol').textContent = symbol;
+            document.getElementById('trade-tape').innerHTML = TAPE_WAITING;
+            candleSeries.setData(asset.history);
+            volumeSeries.setData(asset.history.map(volumeBar));
+            state.book = null;
+            renderBook();
+            // The server then streams this asset's book and trades.
+            if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ action: 'SUBSCRIBE', symbol }));
+            if (document.getElementById('order-type').value === 'LIMIT') {
+                document.getElementById('limit-price').value = asset.price.toFixed(2);
+            }
+            const amount = document.getElementById('trade-amount');
+            const stepChanged = parseFloat(amount.step) !== asset.qty_step;
+            amount.step = amount.min = asset.qty_step;
+            document.getElementById('trade-amount-label').textContent = asset.qty_step < 1 ? `Quantity (${symbol})` : 'Shares';
+            // Shares <-> coins: a carried-over amount would mean something very different.
+            if (stepChanged || toUnits(symbol, parseFloat(amount.value)) === null) amount.value = defaultQty(asset);
+            renderMarketList();
+            updateOrderPreview();
+        }
+
+        // Rebuilt only on tab/asset change; ticks update the price text in place so clicks aren't lost.
+        function renderMarketList() {
+            document.getElementById('market-list').innerHTML = state.symbols
+                .filter(sym => state.assets[sym].type === state.currentTab)
+                .map(sym => {
+                    const a = state.assets[sym];
+                    const selected = sym === state.selectedSymbol ? 'bg-slate-800 border-l-2 border-blue-500' : 'hover:bg-slate-800/50';
+                    return `
+                    <button type="button" data-symbol="${sym}" class="w-full text-left flex justify-between items-center p-2 rounded-lg cursor-pointer transition-colors ${selected}">
+                        <div>
+                            <div class="font-bold text-white">${sym}</div>
+                            <div class="text-xs text-slate-400">${a.name}</div>
+                        </div>
+                        <div id="mw-price-${sym}" class="font-mono text-sm">${formatMoney(a.price)}</div>
+                    </button>`;
+                }).join('');
+        }
+
+        document.getElementById('market-list').addEventListener('click', (e) => {
+            const row = e.target.closest('[data-symbol]');
+            if (row) selectAsset(row.dataset.symbol);
+        });
+
+        // --- ORDER BOOK & TAPE ---
+        function renderBook() {
+            const asksEl = document.getElementById('book-asks');
+            const bidsEl = document.getElementById('book-bids');
+            const spreadEl = document.getElementById('book-spread');
+            const book = state.book;
+            if (!book) {
+                asksEl.innerHTML = '';
+                bidsEl.innerHTML = '';
+                spreadEl.textContent = 'Loading…';
+                return;
+            }
+            const maxSize = Math.max(1, ...book.asks.map(l => l[1]), ...book.bids.map(l => l[1]));
+            const row = ([price, size, mine], isAsk) => {
+                const pct = Math.round(size / maxSize * 100);
+                const bar = isAsk ? 'rgba(239, 68, 68, 0.15)' : 'rgba(34, 197, 94, 0.15)';
+                return `
+                <div class="grid grid-cols-3 px-1 leading-5" style="background: linear-gradient(to left, ${bar} ${pct}%, transparent ${pct}%)">
+                    <span class="${isAsk ? 'text-red-400' : 'text-green-400'}">${formatMoney(price)}</span>
+                    <span class="text-right text-slate-300">${fmtQty(book.symbol, size)}</span>
+                    <span class="text-right ${mine ? 'text-amber-400 font-bold' : ''}">${mine ? fmtQty(book.symbol, mine) : ''}</span>
+                </div>`;
+            };
+            asksEl.innerHTML = [...book.asks].reverse().map(l => row(l, true)).join('');  // best ask next to the spread
+            bidsEl.innerHTML = book.bids.map(l => row(l, false)).join('');
+            if (book.asks.length && book.bids.length) {
+                const ask = book.asks[0][0], bid = book.bids[0][0];
+                spreadEl.textContent = `Spread ${formatMoney(ask - bid)} (${((ask - bid) / ((ask + bid) / 2) * 1e4).toFixed(1)} bps)`;
+            } else {
+                spreadEl.textContent = 'One side of the book is empty';
+            }
+        }
+
+        function appendTrades(trades) {
+            if (!trades.length) return;
+            const tape = document.getElementById('trade-tape');
+            if (tape.innerHTML.includes('Waiting for trades')) tape.innerHTML = '';
+            const sym = state.selectedSymbol;
+            const rows = trades.map(([price, qty, side, mine]) => `
+                <div class="flex justify-between items-center ${side === 'BUY' ? 'text-green-400' : 'text-red-400'}">
+                    <span class="font-bold">${side} ${fmtQty(sym, qty)}${mine ? ' <span class="text-amber-400 text-xs">YOU</span>' : ''}</span>
+                    <span>@ ${formatMoney(price)}</span>
+                </div>`);
+            tape.insertAdjacentHTML('afterbegin', rows.reverse().join(''));  // newest first
+            while (tape.children.length > TAPE_MAX_ROWS) tape.removeChild(tape.lastElementChild);
+        }
+
+        // Walk the visible book to estimate a market order's average fill price.
+        function estimateFill(side, shares) {
+            const book = state.book;
+            if (!book || book.symbol !== state.selectedSymbol || shares <= 0) return null;
+            const levels = side === 'BUY' ? book.asks : book.bids;
+            if (!levels.length) return null;
+            let left = shares, cost = 0;
+            for (const [price, size] of levels) {
+                const take = Math.min(left, size);
+                cost += take * price;
+                left -= take;
+                if (!left) break;
+            }
+            const filled = shares - left;
+            return { avg: cost / filled, best: levels[0][0], complete: left === 0 };
+        }
+
+        // --- TRADING ---
+        function setTradeMode(mode) {
+            state.tradeMode = mode;
+            document.getElementById('mode-buy').className = mode === 'BUY'
+                ? 'flex-1 py-1.5 rounded-md text-sm font-bold bg-green-600/20 text-green-400'
+                : 'flex-1 py-1.5 rounded-md text-sm font-bold text-slate-400 hover:text-white';
+            document.getElementById('mode-sell').className = mode === 'SELL'
+                ? 'flex-1 py-1.5 rounded-md text-sm font-bold bg-red-600/20 text-red-400'
+                : 'flex-1 py-1.5 rounded-md text-sm font-bold text-slate-400 hover:text-white';
+
+            const btn = document.getElementById('btn-execute-trade');
+            btn.textContent = `Execute ${mode}`;
+            btn.className = `w-full mt-4 py-3 rounded-lg font-bold text-lg transition-all shadow-lg active:scale-95 text-white ${
+                mode === 'BUY' ? 'bg-green-600 hover:bg-green-500' : 'bg-red-600 hover:bg-red-500'}`;
+            updateOrderPreview();
+        }
+
+        function toggleLimitInput() {
+            const isLimit = document.getElementById('order-type').value === 'LIMIT';
+            document.getElementById('limit-price-container').classList.toggle('hidden', !isLimit);
+            const limitInput = document.getElementById('limit-price');
+            const asset = state.assets[state.selectedSymbol];
+            if (isLimit && !limitInput.value && asset) limitInput.value = asset.price.toFixed(2);
+            updateOrderPreview();
+        }
+
+        // Cash and holdings an order can actually use (pending orders reserve some).
+        function availableToSell(symbol) {
+            const pos = state.account.positions.find(p => p.ticker === symbol);
+            const reserved = state.account.orders
+                .filter(o => o.ticker === symbol && o.side === 'SELL')
+                .reduce((sum, o) => sum + (o.qty - o.filled), 0);
+            return Math.max(0, (pos ? pos.qty : 0) - reserved);
+        }
+
+        function availableCash() {
+            return state.account.available_cash ?? state.account.cash;
+        }
+
+        function fillMax() {
+            const asset = state.assets[state.selectedSymbol];
+            if (!asset) return;
+            let qty;
+            if (state.tradeMode === 'SELL') {
+                qty = availableToSell(asset.symbol);
+            } else {
+                const isLimit = document.getElementById('order-type').value === 'LIMIT';
+                const limitPrice = parseFloat(document.getElementById('limit-price').value) || 0;
+                const est = estimateFill('BUY', Number.MAX_SAFE_INTEGER);
+                const price = isLimit && limitPrice > 0 ? limitPrice : (est ? est.best : asset.price);
+                qty = Math.max(0, (availableCash() - state.config.fee) / price);
+            }
+            const units = Math.floor(qty / asset.qty_step + 1e-9);
+            document.getElementById('trade-amount').value = String(Number((units * asset.qty_step).toFixed(qtyDecimals(asset.symbol))));
+            updateOrderPreview();
+        }
+
+        function updateOrderPreview() {
+            const asset = state.assets[state.selectedSymbol];
+            if (!asset) return;
+            const qty = parseFloat(document.getElementById('trade-amount').value) || 0;
+            const isLimit = document.getElementById('order-type').value === 'LIMIT';
+            const limitPrice = parseFloat(document.getElementById('limit-price').value) || 0;
+            const buying = state.tradeMode === 'BUY';
+            let avgPrice = asset.price;
+            let note = '';
+            if (isLimit && limitPrice > 0) {
+                avgPrice = limitPrice;
+            } else if (!isLimit) {
+                const est = estimateFill(state.tradeMode, qty);
+                if (est) {
+                    avgPrice = est.avg;
+                    const slippage = Math.abs(est.avg / est.best - 1) * 100;
+                    if (!est.complete) note = ' (more than the visible book)';
+                    else if (slippage >= 0.01) note = ` (${slippage.toFixed(2)}% slippage)`;
+                }
+            }
+            const principal = qty * avgPrice;
+            const fee = state.config.fee;
+
+            // A limit order fills at its limit or better, so its totals are worst cases.
+            document.getElementById('preview-avg-label').textContent = isLimit ? 'Limit Price (or better)' : 'Est. Avg Price';
+            document.getElementById('preview-principal-label').textContent = isLimit ? 'Principal at Limit' : 'Est. Principal';
+            document.getElementById('preview-avg').textContent = formatMoney(avgPrice) + note;
+            document.getElementById('preview-principal').textContent = formatMoney(principal);
+            const label = document.getElementById('preview-total-container').firstElementChild;
+            const total = document.getElementById('preview-total');
+            if (buying) {
+                label.textContent = isLimit ? 'Max Total Cost' : 'Est. Total Cost';
+                total.textContent = formatMoney(principal + fee);
+                total.className = 'text-red-400';
+            } else {
+                label.textContent = isLimit ? 'Min Proceeds' : 'Est. Proceeds';
+                total.textContent = formatMoney(Math.max(0, principal - fee));
+                total.className = 'text-green-400';
+            }
+
+            const sellable = availableToSell(asset.symbol);
+            document.getElementById('trade-available').textContent = buying
+                ? `Available cash: ${formatMoney(availableCash())}`
+                : `Available to sell: ${fmtQty(asset.symbol, sellable)} ${asset.qty_step < 1 ? asset.symbol : 'shares'}`;
+            let warning = '';
+            if (qty > 0 && toUnits(asset.symbol, qty) === null) {
+                warning = asset.qty_step < 1 ? `Quantity must be in steps of ${asset.qty_step} ${asset.symbol}.` : 'Shares must be whole numbers.';
+            } else if (buying && principal + fee > availableCash()) {
+                warning = isLimit ? 'Not enough available cash for this order.'
+                                  : 'More than your available cash: only the affordable part will fill.';
+            } else if (!buying && qty > sellable + 1e-9) {
+                warning = 'More than you can sell.';
+            }
+            const warningEl = document.getElementById('preview-warning');
+            warningEl.textContent = warning;
+            warningEl.classList.toggle('hidden', !warning);
+        }
+
+        function executeTrade() {
+            const asset = state.assets[state.selectedSymbol];
+            if (!asset) return;
+            const qty = parseFloat(document.getElementById('trade-amount').value);
+            const isLimit = document.getElementById('order-type').value === 'LIMIT';
+            const limitPrice = parseFloat(document.getElementById('limit-price').value);
+            const units = toUnits(asset.symbol, qty);
+
+            if (units === null) {
+                return showOrderStatus(asset.qty_step < 1
+                    ? `Enter a quantity in steps of ${asset.qty_step} ${asset.symbol}.` : 'Enter a whole number of shares.', false);
+            }
+            if (isLimit && !(limitPrice > 0)) return showOrderStatus('Enter a valid limit price.', false);
+
+            send({
+                action: 'ORDER',
+                ticker: asset.symbol,
+                side: state.tradeMode,
+                type: isLimit ? 'LIMIT' : 'MARKET',
+                quantity: Number((units * asset.qty_step).toFixed(qtyDecimals(asset.symbol))),
+                limit_price: isLimit ? limitPrice : null,
+            });
+        }
+
+        function showOrderStatus(message, ok) {
+            const el = document.getElementById('order-status');
+            el.textContent = message;
+            el.className = `mt-3 text-sm min-h-[1.25rem] ${ok ? 'text-green-400' : 'text-red-400'}`;
+            clearTimeout(orderStatusTimer);
+            orderStatusTimer = setTimeout(() => { el.textContent = ''; }, 5000);
+        }
+
+        document.getElementById('limit-order-list').addEventListener('click', (e) => {
+            const btn = e.target.closest('[data-order-id]');
+            if (btn) send({ action: 'CANCEL', order_id: Number(btn.dataset.orderId) });
+        });
+
+        // --- ACCOUNT RENDERING ---
+        function renderAccount() {
+            renderHUD();
+            renderHoldings();
+            renderLimitOrders();
+        }
+
+        function renderHUD() {
+            const available = state.account.available_cash ?? state.account.cash;
+            document.getElementById('cash-display').textContent = formatMoney(available);
+            const reserved = state.account.cash - available;
+            const reservedEl = document.getElementById('reserved-display');
+            reservedEl.classList.toggle('hidden', !(reserved > 0.005));
+            reservedEl.textContent = `${formatMoney(reserved)} reserved by orders`;
+            document.getElementById('net-worth-display').textContent = formatMoney(state.account.net_worth);
+            document.getElementById('fees-display').textContent = formatMoney(state.account.fees_paid);
+        }
+
+        function renderHoldings() {
+            const list = document.getElementById('portfolio-list');
+            if (state.account.positions.length === 0) {
+                list.innerHTML = '<div class="text-slate-500 text-sm italic">No positions yet. Buy something from the trade panel.</div>';
+                updatePortfolioValues();
+                return;
+            }
+            list.innerHTML = '<div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-3">' +
+                state.account.positions.map(pos => {
+                    const asset = state.assets[pos.ticker];
+                    const unit = asset.qty_step < 1 ? pos.ticker : (pos.qty === 1 ? 'share' : 'shares');
+                    return `
+                    <button type="button" data-symbol="${pos.ticker}" title="Show ${pos.ticker}" class="text-left p-3 bg-slate-950 rounded-lg border border-slate-800 hover:border-slate-600 transition-colors text-sm">
+                        <div class="flex justify-between items-baseline font-bold mb-1">
+                            <span>${pos.ticker} <span class="text-slate-500 font-normal text-xs ml-1">${fmtQty(pos.ticker, pos.qty)} ${unit}</span></span>
+                            <span id="pf-value-${pos.ticker}"></span>
+                        </div>
+                        <div class="flex justify-between text-xs">
+                            <span class="text-slate-400">Avg cost ${formatMoney(pos.avg_cost)}</span>
+                            <span id="pf-pl-${pos.ticker}"></span>
+                        </div>
+                    </button>`;
+                }).join('') + '</div>';
+            updatePortfolioValues();
+        }
+
+        function updatePortfolioValues() {
+            let value = 0, cost = 0;
+            for (const pos of state.account.positions) {
+                const asset = state.assets[pos.ticker];
+                const posValue = pos.qty * asset.price;
+                const posCost = pos.qty * pos.avg_cost;
+                const pl = posValue - posCost;
+                value += posValue;
+                cost += posCost;
+                const valueEl = document.getElementById(`pf-value-${pos.ticker}`);
+                const plEl = document.getElementById(`pf-pl-${pos.ticker}`);
+                if (valueEl) valueEl.textContent = formatMoney(posValue);
+                if (plEl) {
+                    plEl.textContent = `${pl >= 0 ? '+' : ''}${formatMoney(pl)} (${pl >= 0 ? '+' : ''}${(posCost ? pl / posCost * 100 : 0).toFixed(2)}%)`;
+                    plEl.className = pl >= 0 ? 'text-green-400' : 'text-red-400';
+                }
+            }
+            const pl = value - cost;
+            document.getElementById('portfolio-summary').innerHTML = state.account.positions.length
+                ? `Value ${formatMoney(value)} · Cost ${formatMoney(cost)} · Unrealized <span class="${pl >= 0 ? 'text-green-400' : 'text-red-400'}">${pl >= 0 ? '+' : ''}${formatMoney(pl)}</span>`
+                : '';
+        }
+
+        document.getElementById('portfolio-list').addEventListener('click', (e) => {
+            const card = e.target.closest('[data-symbol]');
+            if (card) switchTab(state.assets[card.dataset.symbol].type, card.dataset.symbol);
+        });
+
+        function renderLimitOrders() {
+            const list = document.getElementById('limit-order-list');
+            if (state.account.orders.length === 0) {
+                list.innerHTML = '<div class="text-slate-500 text-sm italic">No pending orders.</div>';
+                return;
+            }
+            list.innerHTML = state.account.orders.map(o => `
+                <div class="flex justify-between items-center p-2 bg-slate-950 rounded border border-slate-800 text-sm">
+                    <div>
+                        <span class="${o.side === 'BUY' ? 'text-green-400' : 'text-red-400'} font-bold">${o.side}</span>
+                        ${fmtQty(o.ticker, o.qty)} ${o.ticker}${o.filled ? ` <span class="text-xs text-slate-500">${fmtQty(o.ticker, o.filled)}/${fmtQty(o.ticker, o.qty)} filled</span>` : ''}
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <span class="font-mono">@ ${formatMoney(o.limit_price)}</span>
+                        <button type="button" data-order-id="${o.id}" title="Cancel order" class="text-slate-500 hover:text-red-500">×</button>
+                    </div>
+                </div>`).join('');
+        }
+
+        // --- CONTROLS ---
+        function renderStatus() {
+            const btn = document.getElementById('btn-play-pause');
+            const pill = document.getElementById('status-pill');
+            let label = 'Paused', color = 'text-amber-400';
+            if (!state.connected) { label = 'Offline'; color = 'text-red-400'; }
+            else if (state.ended) { label = 'Week over'; color = 'text-slate-400'; }
+            else if (state.running) { label = 'Live'; color = 'text-green-400'; }
+            pill.textContent = label;
+            pill.className = `text-xs font-semibold uppercase tracking-wider ${color}`;
+            btn.innerHTML = state.running ? PAUSE_ICON : PLAY_ICON;
+            btn.title = state.running ? 'Pause (Space)' : 'Play (Space)';
+            const disabled = !state.connected || state.ended;
+            btn.disabled = disabled;
+            document.getElementById('btn-fast-forward').disabled = disabled;
+        }
+
+        function togglePlay() {
+            send({ action: state.running ? 'PAUSE' : 'PLAY' });
+        }
+
+        // --- KEYBOARD SHORTCUTS ---
+        // Space: play/pause · 1-5: asset tabs · Tab: quantity <-> limit price · Esc: leave the field ·
+        // `: buy/sell · \: market/limit · Shift+Enter: execute · N: news.
+        // Like vim: a focused trade field is "insert mode" (digits type); Esc returns to "normal mode".
+        // Digits type normally in the quantity/limit fields; the other shortcuts still work there,
+        // since a number field has no use for them. Modifier combos (Ctrl+1 etc.) are left alone.
+        const TEXT_ENTRY = 'input, textarea, [contenteditable="true"]';
+        const TRADE_FIELDS = '#trade-amount, #limit-price';
+        const isOpen = (id) => !document.getElementById(id).classList.contains('hidden');
+
+        function shortcutContext(target) {
+            const inTradeField = !!target.closest(TRADE_FIELDS);
+            return {
+                inTradeField,
+                // Where non-digit shortcuts (Space, `, N) should be left to the element instead.
+                blocked: !!target.closest(TEXT_ENTRY) && !inTradeField,
+                inSelect: !!target.closest('select'),
+            };
+        }
+
+        // Focus quantity, or move between quantity and limit price, with the value selected.
+        function cycleTradeField(backwards) {
+            const fields = [document.getElementById('trade-amount')];
+            if (document.getElementById('order-type').value === 'LIMIT') fields.push(document.getElementById('limit-price'));
+            const i = fields.indexOf(document.activeElement);
+            const next = i === -1 ? fields[0] : fields[(i + (backwards ? -1 : 1) + fields.length) % fields.length];
+            next.focus();
+            next.select();
+        }
+
+        function toggleOrderType() {
+            const select = document.getElementById('order-type');
+            const limitField = document.getElementById('limit-price');
+            const leavingLimit = select.value === 'LIMIT';
+            select.value = leavingLimit ? 'MARKET' : 'LIMIT';
+            toggleLimitInput();
+            // The limit field is about to be hidden: keep typing in the quantity instead.
+            if (leavingLimit && document.activeElement === limitField) cycleTradeField(false);
+        }
+
+        // N: close the news if it's open; otherwise open the live headline, or the latest one this week.
+        function toggleNewsModal() {
+            if (isOpen('news-modal')) return closeNewsModal();
+            if (state.news) return openNewsModal();
+            const latest = state.newsLog[state.newsLog.length - 1];
+            if (latest) openNewsModal(latest.id);
+        }
+
+        document.addEventListener('keydown', (e) => {
+            if (e.ctrlKey || e.metaKey || e.altKey || isOpen('end-game-modal')) return;
+            const ctx = shortcutContext(e.target);
+            const key = e.key;
+
+            if (key.toLowerCase() === 'n' && !ctx.blocked) {
+                e.preventDefault();
+                if (!e.repeat) toggleNewsModal();
+                return;
+            }
+            if (isOpen('news-modal')) return;  // everything else waits until the news is closed
+
+            if (key === 'Tab') {
+                e.preventDefault();
+                cycleTradeField(e.shiftKey);
+            } else if (key === 'Escape' && ctx.inTradeField) {
+                e.preventDefault();
+                if (document.activeElement) document.activeElement.blur();
+            } else if ((e.code === 'Backslash' || key === '\\' || key === '|') && !ctx.blocked) {
+                e.preventDefault();
+                if (!e.repeat) toggleOrderType();
+            } else if (key === 'Enter' && e.shiftKey && !ctx.blocked) {
+                e.preventDefault();
+                if (!e.repeat) executeTrade();  // holding the keys never sends a second order
+            } else if ((e.code === 'Backquote' || key === '`' || key === '~') && !ctx.blocked) {
+                e.preventDefault();
+                if (!e.repeat) setTradeMode(state.tradeMode === 'BUY' ? 'SELL' : 'BUY');
+            } else if (/^[1-5]$/.test(key) && !ctx.inTradeField && !ctx.blocked) {
+                e.preventDefault();
+                if (!e.repeat) switchTab(TAB_TYPES[Number(key) - 1]);
+            } else if (e.code === 'Space' && !ctx.blocked && !ctx.inSelect) {
+                // Cancelling keydown and keyup stops Space from "clicking" a focused button (e.g. Execute).
+                e.preventDefault();
+                if (!e.repeat && state.connected && !state.ended) togglePlay();
+            }
+        });
+        document.addEventListener('keyup', (e) => {
+            const ctx = shortcutContext(e.target);
+            if (e.code === 'Space' && !ctx.blocked && !ctx.inSelect && !isOpen('news-modal') && !isOpen('end-game-modal')) {
+                e.preventDefault();
+            }
+        });
+
+        // --- FILL NOTIFICATIONS ---
+        let soundOn = true;
+        try { soundOn = localStorage.getItem('fillSound') !== 'off'; } catch (e) { /* storage unavailable */ }
+        let audioCtx = null;
+
+        function renderSoundButton() {
+            const btn = document.getElementById('btn-sound');
+            btn.innerHTML = soundOn ? BELL_ON : BELL_OFF;
+            btn.title = `Fill sound: ${soundOn ? 'on' : 'off'}`;
+        }
+
+        function toggleSound() {
+            soundOn = !soundOn;
+            try { localStorage.setItem('fillSound', soundOn ? 'on' : 'off'); } catch (e) { /* storage unavailable */ }
+            renderSoundButton();
+            if (soundOn) ping('BUY');
+        }
+
+        // A short, quiet two-note chime; higher for buys, lower for sells.
+        function ping(side) {
+            if (!soundOn) return;
+            try {
+                audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+                const now = audioCtx.currentTime;
+                const base = side === 'BUY' ? 880 : 660;
+                [0, 0.07].forEach((offset, i) => {
+                    const osc = audioCtx.createOscillator();
+                    const gain = audioCtx.createGain();
+                    osc.type = 'sine';
+                    osc.frequency.value = base * (i ? 1.5 : 1);
+                    gain.gain.setValueAtTime(0.0001, now + offset);
+                    gain.gain.exponentialRampToValueAtTime(0.06, now + offset + 0.01);
+                    gain.gain.exponentialRampToValueAtTime(0.0001, now + offset + 0.16);
+                    osc.connect(gain).connect(audioCtx.destination);
+                    osc.start(now + offset);
+                    osc.stop(now + offset + 0.18);
+                });
+            } catch (e) { /* audio unavailable */ }
+        }
+
+        function notifyFill(fill) {
+            if (!fill) return;
+            const buy = fill.side === 'BUY';
+            const toasts = document.getElementById('toasts');
+            const el = document.createElement('div');
+            el.className = `px-3 py-2 rounded-lg border shadow-lg text-sm font-semibold backdrop-blur transition-all duration-300 opacity-0 translate-y-2 ${
+                buy ? 'bg-green-950/90 border-green-700 text-green-300' : 'bg-red-950/90 border-red-700 text-red-300'}`;
+            el.textContent = `${buy ? '▲ Bought' : '▼ Sold'} ${fmtQty(fill.ticker, fill.qty)} ${fill.ticker} @ ${formatMoney(fill.avg)}` +
+                (fill.remaining > 0 ? ` · ${fmtQty(fill.ticker, fill.remaining)} left` : '');
+            toasts.appendChild(el);
+            requestAnimationFrame(() => el.classList.remove('opacity-0', 'translate-y-2'));
+            while (toasts.children.length > 4) toasts.removeChild(toasts.firstElementChild);
+            setTimeout(() => {
+                el.classList.add('opacity-0');
+                setTimeout(() => el.remove(), 300);
+            }, 3000);
+            ping(fill.side);
+        }
+
+        function fastForward() {
+            if (confirm('End the trading week now and see your performance report?')) send({ action: 'FAST_FORWARD' });
+        }
+
+        function newGame() {
+            send({ action: 'NEW_GAME' });
+        }
+
+        // --- NEWS ---
+        const NEWS_TARGETS = { GLOBAL: 'All markets', STOCK: 'Stocks', ETF: 'ETFs', CRYPTO: 'Crypto', REIT: 'REITs', BOND: 'Bonds' };
+        const QUIET_NEWS = 'No breaking news. Markets are trading normally.';
+        const NEWS_TAB_BASE = 'text-white text-xs font-bold px-4 py-2 uppercase tracking-wider whitespace-nowrap z-10';
+        const NEWS_TICKER_BASE = 'absolute whitespace-nowrap text-sm font-medium px-4 transition-colors';
+
+        // live: the change just happened (vs. a resync), so show the "stabilizing" transition.
+        function applyNews(news, log, live) {
+            const hadNews = state.news !== null;
+            state.news = news;
+            state.newsLog = log || [];
+            renderNewsLog();
+            clearTimeout(newsQuietTimer);
+            if (news) {
+                const crash = news.impact === 'CRASH';
+                const tab = document.getElementById('news-header-tab');
+                tab.textContent = crash ? 'Crash Alert' : 'Breaking';
+                tab.className = `${crash ? 'bg-red-600' : 'bg-green-600'} ${NEWS_TAB_BASE} animate-pulse`;
+                const ticker = document.getElementById('news-ticker');
+                ticker.textContent = `BREAKING: ${news.headline} (${NEWS_TARGETS[news.target]}) — click for details`;
+                ticker.className = `${NEWS_TICKER_BASE} animate-marquee cursor-pointer text-white hover:text-blue-400`;
+            } else if (hadNews && live) {
+                setQuietNews('Markets stabilizing...');
+                newsQuietTimer = setTimeout(() => setQuietNews(QUIET_NEWS), 5000);
+            } else {
+                setQuietNews(QUIET_NEWS);
+            }
+        }
+
+        function setQuietNews(text) {
+            const tab = document.getElementById('news-header-tab');
+            tab.textContent = 'News';
+            tab.className = `bg-slate-700 ${NEWS_TAB_BASE}`;
+            const ticker = document.getElementById('news-ticker');
+            ticker.textContent = text;
+            ticker.className = `${NEWS_TICKER_BASE} text-slate-500`;
+        }
+
+        // Rebuilt only when news changes (rare), so its rows stay clickable.
+        function renderNewsLog() {
+            const list = document.getElementById('news-log');
+            const n = state.newsLog.length;
+            document.getElementById('news-count').textContent = `${n} headline${n === 1 ? '' : 's'} this week`;
+            if (n === 0) {
+                list.innerHTML = '<div class="text-slate-500 text-sm italic">No headlines yet. Major market events break between Day 2 and Day 6.</div>';
+                return;
+            }
+            list.innerHTML = [...state.newsLog].reverse().map(e => {
+                const crash = e.impact === 'CRASH';
+                const border = e.active ? (crash ? 'border-red-500' : 'border-green-500') : 'border-slate-800';
+                return `
+                <button type="button" data-news-id="${e.id}" class="w-full text-left p-2 rounded-lg bg-slate-950 border ${border} hover:bg-slate-800/50 transition-colors">
+                    <div class="flex justify-between items-center gap-2 text-xs mb-1">
+                        <span class="font-bold ${crash ? 'text-red-400' : 'text-green-400'}">${crash ? '▼ Crash' : '▲ Boom'} · ${NEWS_TARGETS[e.target]}</span>
+                        <span class="text-slate-500 whitespace-nowrap">${e.active ? '<span class="text-amber-400 font-bold">LIVE</span> · ' : ''}${e.clock}</span>
+                    </div>
+                    <div class="text-sm text-white">${e.headline}</div>
+                </button>`;
+            }).join('');
+        }
+
+        document.getElementById('news-log').addEventListener('click', (e) => {
+            const row = e.target.closest('[data-news-id]');
+            if (row) openNewsModal(Number(row.dataset.newsId));
+        });
+
+        // With no id, opens the active headline (the ticker). Reading news pauses the market.
+        function openNewsModal(id) {
+            const entry = id === undefined ? state.news : state.newsLog.find(e => e.id === id);
+            if (!entry) return;
+            state.resumeAfterNews = state.running;
+            if (state.running) send({ action: 'PAUSE' });
+            document.getElementById('news-modal-headline').textContent = entry.headline;
+            document.getElementById('news-modal-meta').textContent =
+                `${entry.clock} · Affects ${NEWS_TARGETS[entry.target]} · ${entry.active ? 'Developing now' : 'Ended'}`;
+            document.getElementById('news-modal-body').textContent = entry.body;
+            document.getElementById('news-modal-header').className = `${entry.impact === 'CRASH' ? 'bg-red-600' : 'bg-green-600'} p-4`;
+            document.getElementById('btn-close-news').textContent = state.resumeAfterNews ? 'Close & Resume' : 'Close';
+            const modal = document.getElementById('news-modal');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+
+        function closeNewsModal() {
+            const modal = document.getElementById('news-modal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+            if (state.resumeAfterNews) send({ action: 'PLAY' });
+            state.resumeAfterNews = false;
+        }
+
+        // --- END OF WEEK ---
+        function showEndGame(report) {
+            document.getElementById('end-net-worth').textContent = formatMoney(report.net_worth);
+            const profitEl = document.getElementById('end-profit');
+            profitEl.textContent = (report.profit >= 0 ? '+' : '') + formatMoney(report.profit);
+            profitEl.className = `text-3xl font-bold ${report.profit >= 0 ? 'text-green-400' : 'text-red-400'}`;
+            document.getElementById('end-fees').textContent = formatMoney(report.fees_paid);
+
+            const modal = document.getElementById('end-game-modal');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+
+            if (pnlChart) pnlChart.destroy();
+            pnlChart = new Chart(document.getElementById('pnl-chart'), {
+                type: 'line',
+                data: {
+                    labels: report.net_worth_history.map((_, i) => `Hr ${i}`),
+                    datasets: [{
+                        label: 'Portfolio Value',
+                        data: report.net_worth_history,
+                        borderColor: '#3b82f6',
+                        backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                        borderWidth: 2,
+                        fill: true,
+                        tension: 0.2,
+                        pointRadius: 0,
+                    }],
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { display: false },
+                        y: { grid: { color: '#1e293b' }, ticks: { color: '#94a3b8' } },
+                    },
+                },
+            });
+        }
+
+        function hideEndGame() {
+            const modal = document.getElementById('end-game-modal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+            if (pnlChart) { pnlChart.destroy(); pnlChart = null; }
+        }
+
+        // --- UTILS ---
+        function qtyDecimals(symbol) {
+            const step = (state.assets[symbol] || {}).qty_step || 1;
+            return Math.max(0, Math.round(-Math.log10(step)));
+        }
+
+        // Shares/coins for display: whole numbers for shares, up to the step's decimals for crypto.
+        function fmtQty(symbol, qty) {
+            const decimals = qtyDecimals(symbol);
+            return Number(qty).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: decimals });
+        }
+
+        // null unless qty is a positive multiple of the asset's step.
+        function toUnits(symbol, qty) {
+            const step = (state.assets[symbol] || {}).qty_step || 1;
+            if (!(qty > 0)) return null;
+            const units = Math.round(qty / step);
+            return units > 0 && Math.abs(units * step - qty) <= step * 1e-6 ? units : null;
+        }
+
+        // About $500 worth for crypto (0.01 BTC, 0.1 ETH), 1 share otherwise.
+        function defaultQty(asset) {
+            if (asset.qty_step >= 1) return 1;
+            const qty = Math.max(asset.qty_step, 10 ** Math.floor(Math.log10(500 / asset.price)));
+            return String(Number(qty.toFixed(qtyDecimals(asset.symbol))));  // "0.01", not "0.0100"
+        }
+
+        function formatMoney(num) {
+            const abs = Math.abs(num).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            return (num < 0 ? '-$' : '$') + abs;
+        }
+
+        renderStatus();
+        renderSoundButton();
+        connect();
+    </script>
+</body>
+</html>
