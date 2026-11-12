@@ -101,7 +101,7 @@ venv/bin/pip install -r requirements-build.txt
 venv/bin/pyinstaller --noconfirm --clean finbro_larper.spec
 ```
 
-The result is `dist/FinBro_Larper` (`dist\FinBro_Larper.exe` on Windows), a single file of about 25 MB. To check it, run `venv/bin/python tests/smoke_executable.py dist/FinBro_Larper`. That starts it from another folder, checks the bundled page, places a trade over the WebSocket, and quits it.
+The result is `dist/FinBro_Larper` (`dist\FinBro_Larper.exe` on Windows), a single file of 20–40 MB (CI builds: about 22 MB on Windows, 40 MB on Linux). To check it, run `venv/bin/python tests/smoke_executable.py dist/FinBro_Larper`. That starts it from another folder, checks the bundled page, places a trade over the WebSocket, and quits it.
 
 A Linux build only runs on systems with the same glibc as the build machine or newer. That's why release builds come from GitHub Actions' Ubuntu 22.04 runner and not from a rolling distro.
 

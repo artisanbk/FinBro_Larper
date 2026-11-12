@@ -11,7 +11,7 @@ venv/bin/uvicorn main:app --reload              # dev server at http://127.0.0.1
 venv/bin/python run.py [--port N] [--no-browser] # launcher: free port, opens the browser (the packaged entry point)
 
 venv/bin/pip install -r requirements-build.txt  # PyInstaller (pinned)
-venv/bin/pyinstaller --noconfirm --clean finbro_larper.spec   # -> dist/FinBro_Larper, single file, about 25 MB
+venv/bin/pyinstaller --noconfirm --clean finbro_larper.spec   # -> dist/FinBro_Larper, single file, 20–40 MB
 ```
 
 Every server start begins a fresh 7-day game: `lifespan` drops and recreates all tables. Model changes therefore never need a migration, and with `--reload` every saved edit restarts the game.
