@@ -1,6 +1,6 @@
 # FinBro_Larper
 
-A 7-day stock market trading game. You start with $10,000 and trade stocks, ETFs, crypto, REITs and bonds in a market full of simulated traders, then see how you did when the week ends.
+A month-long stock market trading game. You start with $10,000 and trade stocks, ETFs, crypto, REITs and bonds in a market full of simulated traders, then see how you did when the month ends.
 
 ## Playing
 
@@ -29,13 +29,19 @@ A small window shows the game's address, and your browser opens the game. Press 
 
 ### How to play
 
-- **The week:** it lasts 7 in-game days, and one day is one real minute. Pause any time. "End Day 7" skips to your results.
+- **The month:** it lasts 28 in-game days (4 weeks), and one day is one real minute. Pause any time.
+- **Skipping ahead:**
+  - **Skip week** (W) fast-forwards to the start of next week and pauses there.
+  - **Skip month** (M) fast-forwards to the end of the month.
+  - The market really plays out, at 2 days a second, so news still breaks, prices move and your pending orders can fill on the way. Press Space to stop a skip.
 - **The market:** prices come from simulated traders buying and selling in each asset's order book, shown on the right.
   - **Market orders** fill right away against the book. Large ones fill at several prices (slippage).
   - **Limit orders** wait in the book until someone trades at your price or better, and can fill in parts.
   - Pending orders set aside the cash or holdings they need.
+- **Your trades on the chart:** each buy shows as a blue arrow at its entry price, with a blue line at your average entry while you hold. Pending limit orders are faint gray dashed lines at their prices.
+- **The report:** at the month's end you see your net worth over time, what you still hold (value and P/L), and how the market reacted to each headline. Pick one to chart each affected asset's price from 6 hours before to 24 hours after, against how far the news should have moved it.
 - **Fees and quantities:** every order that executes costs a $5 fee. Crypto can be traded in fractions (0.0001 BTC, 0.001 ETH).
-- **News:** two big events hit during the week. The news bar and Market News panel show them, and clicking a headline pauses the market while you read.
+- **News:** each month follows a hidden storyline: a chain of related events, like a crypto hack that leads to a regulator probe. It's revealed in your month-end report. The story plays out differently every game: events can go either way, some don't happen, and their size varies. A few unrelated headlines (some just rumors) mix in. The news bar and Market News panel show each headline and the markets it moves (▲/▼), and clicking a headline pauses the market while you read.
 
 ### Keyboard shortcuts
 
@@ -49,6 +55,8 @@ A small window shows the game's address, and your browser opens the game. Press 
 | `\` | Switch market / limit order |
 | Shift+Enter | Execute the order |
 | N | Open / close the news |
+| W | Skip to next week |
+| M | Skip to the end of the month |
 
 While you're typing in the quantity or limit field, digits type as normal; the other shortcuts still work. Hover the keyboard icon in the header for this list.
 
@@ -72,12 +80,12 @@ venv/bin/python run.py                  # starts the server and opens the browse
 venv/bin/uvicorn main:app --reload      # development: restarts on code changes; open http://127.0.0.1:8000
 ```
 
-Every start (and every `--reload`) begins a fresh week. From source, the database is `simulator.db` next to the code; it's rebuilt on each start.
+Every start (and every `--reload`) begins a fresh month. From source, the database is `simulator.db` next to the code; it's rebuilt on each start.
 
 ### Test
 
 ```sh
-venv/bin/pytest                          # the whole suite, about 35 s
+venv/bin/pytest                          # the whole suite, about 55 s
 venv/bin/pytest tests/test_engine.py     # one file
 venv/bin/pytest -k fractional            # tests whose name matches
 ```
@@ -86,7 +94,7 @@ venv/bin/pytest -k fractional            # tests whose name matches
 |---|---|
 | `test_orderbook.py` | Order matching rules |
 | `test_engine.py` | Orders, account rules, fractional crypto, news, clock, seeds |
-| `test_market_behaviour.py` | Simulated weeks: prices track value, books stay filled, news moves prices |
+| `test_market_behaviour.py` | Simulated games: prices track value, books stay filled, news moves prices |
 | `test_protocol.py`, `test_frozen_client.py` | The WebSocket protocol against a real server, including a frozen-tab regression |
 | `test_page.py` | The page's JavaScript, driven in Node (needs Node 22+; skipped otherwise) |
 
@@ -120,7 +128,7 @@ To build for Linux and Windows without a Windows machine, run **Build executable
 |---|---|
 | `run.py` | Launcher: picks a port, starts the server, opens the browser |
 | `main.py` | FastAPI app, WebSocket endpoint, market loop |
-| `game.py` | One trading week: clock, news, the player's orders and account |
+| `game.py` | One trading month: clock, news, skips, the player's orders and account, the report |
 | `market.py`, `orderbook.py` | Agent traders and the order book that sets prices |
 | `config.py` | Assets, fees, timing, news and market tuning |
 | `models.py`, `database.py` | SQLite tables and connection |

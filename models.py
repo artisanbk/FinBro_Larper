@@ -29,6 +29,17 @@ class Order(Base):
     fees = Column(Float, default=0.0)  # the per-order fee, charged on the first fill
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))  # naive UTC
 
+class Execution(Base):
+    """What one order filled during one settlement (one tick), so the chart can mark it."""
+    __tablename__ = "executions"
+    id = Column(Integer, primary_key=True, index=True)
+    order_id = Column(Integer, index=True)
+    ticker = Column(String, index=True)
+    side = Column(String)
+    units = Column(Integer)  # in units of the asset's qty_step
+    avg_price = Column(Float)  # average fill price of these units
+    tick = Column(Integer)  # game tick of the fill
+
 class Candle(Base):
     __tablename__ = "candles"
     id = Column(Integer, primary_key=True, index=True)

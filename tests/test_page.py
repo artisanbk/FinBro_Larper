@@ -27,3 +27,5 @@ def test_page_script(server_factory):
     )
     failures = [line for line in result.stdout.splitlines() if line.startswith("FAIL")]
     assert result.returncode == 0, "\n".join(failures) or result.stdout + result.stderr
+    # A crash before the results (e.g. a syntax error in the page) must not pass as "no failures".
+    assert "ALL PASSED" in result.stdout, result.stdout + result.stderr

@@ -5,7 +5,7 @@ Detailed architecture and invariants are in `CLAUDE.md`. The feature list is in 
 
 ## What it is
 
-A single-player, 7-day stock market trading game.
+A single-player, month-long (28 in-game days) stock market trading game.
 - **Server and page:** a FastAPI server runs an agent-based market with one limit order book per asset. A browser page renders it over a single WebSocket (`/ws`).
 - **Packaging:** a single executable per OS (PyInstaller), with no Python or internet needed to play.
 - **Stack:** Python 3.14 venv, SQLite via SQLAlchemy, pytest. The page test needs Node 22+.
@@ -27,7 +27,7 @@ A single-player, 7-day stock market trading game.
 - **Agent-based market instead of a random walk or a pre-generated price path:** the user wanted realism. A pre-generated path is invalidated by the first player order, because the player's orders sit in the same books the agents trade against. So only exogenous inputs (the news schedule and each asset's true-value path) are generated from the seed. Everything else is simulated live, and the same seed with no player input replays exactly.
 - **The market loop never awaits the network:** each client has its own bounded send queue. This fixed "the market stops when I tab out", where a background tab's stalled socket froze the loop.
 - **Quantities are integer units of each asset's `qty_step`** (1 share, 0.0001 BTC, 0.001 ETH), so matching is exact with fractional crypto.
-- **Fresh week on every start:** the DB is dropped and recreated, so there are no migrations. The packaged app uses a per-process temp DB.
+- **Fresh game on every start:** the DB is dropped and recreated, so there are no migrations. The packaged app uses a per-process temp DB.
 - **Order rules:** fees are charged per order, not per fill. Limit orders fill at the book's price; the draft filled at the limit price, which was a bug.
 - **Vendored, pinned JS libraries:** for offline play, and because an unpinned CDN once broke Play.
 
@@ -57,15 +57,26 @@ A single-player, 7-day stock market trading game.
 
 ## Open items and ideas
 
+- **v1.1.0 in progress (started 2026-11-12), one feature at a time:**
+  1. Done (2026-11-12): chart trade marks (blue buy arrows and avg-entry line, gray dashed pending-order lines), backed by a new `Execution` table.
+  2. Done (2026-11-13): storylines replace `NEWS_DB`. The seed picks one of 5; events target GLOBAL, an asset type or a symbol, and their effects add up. At the user's request the news stays surprising: beats branch, some are optional, moves are scaled 0.6–1.4×, and 1–2 wildcards (some rumors) mix in. The market maker now refills an emptied book side at once, which removed rare one-tick empty books that storyline weeks exposed.
+  3. The report lists final holdings.
+  4. The report shows how prices reacted to each event. Agreed metric: % change from the pre-event price over −6h…+24h hourly, plus the move at +2h/+6h/+24h, the peak, and the volume multiple vs. the prior 24h.
+  3. Done (2026-11-13): the report lists holdings at final prices, plus cash.
+  4. Done (2026-11-13): the report has one event study per headline (the metric above); the page charts it per headline, and rumors are revealed there.
+  5. Done (2026-11-13): a 28-day month (4 weeks). Skip week pauses at the next week; Skip month plays to the end. Both run the real simulation at 2 in-game days per second (`Game.frame` batches ticks through `advance`), so news and fills still happen and a seeded game plays the same skipped or not. Shortcuts: W and M. `NEW_GAME` takes `days` for short test games.
+  - Found along the way: the page harness exited 0 when it crashed, so a page syntax error (an unescaped apostrophe, from feature 2) passed the suite. The harness now reports crashes and `test_page` requires `ALL PASSED`.
+  - Released as v1.1.0 (tagged 2026-11-13). The build creates a draft GitHub release that the user reviews and publishes. `TODO.md` (untracked) is the user's progress list.
+
 - **Volatility:** quiet-period volatility is about 65–80% of target. Raising `config.PROFILES[...].daily_vol` would close the gap.
 - **Builds:** There's no macOS build (the user asked for Linux and Windows). The executables are unsigned, so Windows SmartScreen warns on first launch.
-- **One game per server:** everyone who connects shares the same week. That only matters if it's ever hosted for multiple players.
+- **One game per server:** everyone who connects shares the same game. That only matters if it's ever hosted for multiple players.
 - **Unread ideas file:** `../ideas.md`, outside the project folder, holds the user's original ideas. Claude Code couldn't read it because reads outside the working directory are blocked; `/add-dir ..` allows it.
 - **Historical files:** `chat_memory.md` holds notes from an early debugging chat and `stock_market_simulator.html` is the original draft. Neither describes the current code.
 
 ## Verify quickly
 
 ```sh
-venv/bin/pytest            # 55 tests, about 35 s
+venv/bin/pytest            # 80 tests, about 55 s
 venv/bin/python run.py     # play from source
 ```

@@ -58,12 +58,18 @@ const series = {
   },
   priceScale: () => ({ applyOptions() {} }),
 };
+// The player's overlays: series markers (buy entries) and price lines (avg entry, pending orders).
+const overlay = { markers: [], lines: new Set() };
+series.createPriceLine = (options) => { const line = { ...options }; overlay.lines.add(line); return line; };
+series.removePriceLine = (line) => { if (!overlay.lines.delete(line)) chartCalls.errors.push('removed an unknown price line'); };
 const LightweightCharts = {
   createChart: () => ({ addSeries: () => series, priceScale: () => ({ applyOptions() {} }) }),
-  CandlestickSeries: {}, HistogramSeries: {}, CrosshairMode: { Normal: 0 },
+  createSeriesMarkers: () => ({ setMarkers(markers) { overlay.markers = markers; } }),
+  CandlestickSeries: {}, HistogramSeries: {}, CrosshairMode: { Normal: 0 }, LineStyle: { Solid: 0, Dashed: 2 },
 };
 let chartsMade = 0;
-class Chart { constructor() { chartsMade++; } destroy() {} }
+const charts = [];  // every Chart.js config the page created, oldest first
+class Chart { constructor(_, config) { chartsMade++; charts.push(config); } destroy() {} }
 
 const errors = [];
 const ctx = {
@@ -76,6 +82,11 @@ const ctx = {
 ctx.window = ctx;
 vm.createContext(ctx);
 process.on('uncaughtException', (e) => errors.push(e.stack));
+// If the script dies before printing its results (an exception in the async flow), say so and fail.
+let reported = false;
+process.on('exit', () => {
+  if (!reported) { console.log(`FAIL harness crashed before reporting\n${errors.join('\n')}`); process.exitCode = 1; }
+});
 
 const original = 'ws.onmessage = (event) => handleMessage(JSON.parse(event.data));';
 const html = fs.readFileSync(process.argv[2], 'utf8');
@@ -89,8 +100,15 @@ vm.runInContext(src, ctx);
 
 const run = (code) => vm.runInContext(code, ctx);
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+async function until(cond, ms) {  // poll until cond() holds or ms pass
+  for (const end = Date.now() + ms; Date.now() < end; await wait(50)) if (cond()) return true;
+  return cond();
+}
 const el = (id) => elements[id];
 const toastTexts = () => el('toasts').children.map(c => c.textContent);
+const lines = () => [...overlay.lines];
+const avgLine = () => lines().find(l => l.title === 'Avg entry');
+const dashed = () => lines().filter(l => l.lineStyle === 2);
 // Focus contexts for synthetic key events: page body, a generic text field, a trade number field, a <select>.
 const BODY = { closest: () => null };
 const TEXT = { closest: (sel) => (sel.startsWith('input') ? {} : null) };
@@ -106,10 +124,14 @@ function key(type, opts = {}) {
 
 (async () => {
   await wait(800);
+  // A 9-day game (2 weeks), paused, so Skip week and Skip month finish in a few seconds.
+  run("send({ action: 'NEW_GAME', seed: 5, days: 9, running: false })");
+  await wait(600);
   const results = [];
   const check = (cond, label) => results.push(`${cond ? 'PASS' : 'FAIL'} ${label}`);
   check(run('state.connected') && run('state.symbols.length') === 8, 'connected and got snapshot');
   check(el('btn-play-pause').title === 'Play (Space)' && el('status-pill').textContent === 'Paused', 'paused, Space hint on the play button');
+  check(el('clock-display').textContent === 'Week 1 · Day 1 - 09:00 AM', `clock shows the week (${el('clock-display').textContent})`);
   check(el('cash-display').textContent === '$10,000.00', `cash rendered ${el('cash-display').textContent}`);
   check(el('portfolio-list').innerHTML.includes('No positions yet') && el('portfolio-summary').innerHTML === '', 'empty portfolio state');
   check(el('trade-amount-label').textContent === 'Shares' && el('trade-available').textContent === 'Available cash: $10,000.00',
@@ -135,6 +157,12 @@ function key(type, opts = {}) {
   check(/^Value \$[\d,.]+ · Cost \$[\d,.]+ · Unrealized/.test(el('portfolio-summary').innerHTML.replace(/<[^>]+>/g, '')),
         `portfolio summary (${el('portfolio-summary').innerHTML.replace(/<[^>]+>/g, '')})`);
   check(/^[+-]\$[\d,.]+ \([+-][\d.]+%\)$/.test(el('pf-pl-TCHN').textContent), `P/L updates in place (${el('pf-pl-TCHN').textContent})`);
+  const entry0 = overlay.markers[0] || {};
+  check(overlay.markers.length === 1 && entry0.shape === 'arrowUp' && entry0.color === '#3b82f6' && entry0.text === 'B 1'
+        && entry0.position === 'atPriceBottom' && entry0.price === run('state.account.executions[0].price')
+        && run(`state.assets.TCHN.history.some(c => c.time === ${entry0.time})`), `blue entry marker on the buy's candle (${JSON.stringify(overlay.markers)})`);
+  check(avgLine() && avgLine().color === '#3b82f6' && avgLine().axisLabelVisible
+        && avgLine().price === run("state.account.positions.find(p => p.ticker === 'TCHN').avg_cost"), 'blue line at the average entry');
   await wait(3600);
   check(toastTexts().length === 0, 'toast dismisses itself');
 
@@ -148,11 +176,15 @@ function key(type, opts = {}) {
   await wait(300);
   check(el('limit-order-list').innerHTML.includes('data-order-id') && toastTexts().length === 0, 'resting limit order: listed, no fill toast');
   check(el('reserved-display').textContent === '$6.00 reserved by orders', `reserved cash shown (${el('reserved-display').textContent})`);
+  const listing = dashed()[0] || {};
+  check(dashed().length === 1 && listing.title === 'BUY 1' && listing.price === 1 && listing.color === 'rgba(203, 213, 225, 0.45)'
+        && listing.axisLabelVisible === false && overlay.markers.length === 1, `pending order: faint gray dashed line (${JSON.stringify(lines())})`);
   el('order-type').value = 'MARKET';
   run('toggleLimitInput()');
 
   // Fractional crypto
   run("switchTab('CRYPTO')");
+  check(lines().length === 0 && overlay.markers.length === 0, 'overlays follow the selected asset');
   check(run('state.selectedSymbol') === 'BTC' && el('trade-amount-label').textContent === 'Quantity (BTC)'
         && el('trade-amount').value === '0.01' && el('trade-amount').step === 0.0001, `BTC: quantity label, step, default (${el('trade-amount').value})`);
   await wait(400);
@@ -170,6 +202,8 @@ function key(type, opts = {}) {
   check(el('order-status').textContent.startsWith('Bought 0.0123 BTC at avg'), `fractional buy (${el('order-status').textContent})`);
   check(toastTexts().some(t => t.startsWith('▲ Bought 0.0123 BTC @ $')), `fractional fill toast (${toastTexts()})`);
   check(el('portfolio-list').innerHTML.includes('0.0123 BTC'), 'portfolio shows 0.0123 BTC');
+  check(overlay.markers.length === 1 && overlay.markers[0].text === 'B 0.0123' && avgLine() && dashed().length === 0,
+        `fractional buy marked (${JSON.stringify(overlay.markers)})`);
   run("setTradeMode('SELL')");
   run('fillMax()');
   check(el('trade-amount').value === '0.0123' && el('trade-available').textContent === 'Available to sell: 0.0123 BTC',
@@ -229,7 +263,7 @@ function key(type, opts = {}) {
   check(!press('Enter', 'Enter') && !press('Enter', 'Enter', { shiftKey: true, target: TEXT }), 'plain Enter and text fields are left alone');
   await wait(400);
   check(el('order-status').textContent === '', 'held / plain Enter sent no order');
-  check(press('n', 'KeyN') && el('news-modal').classList.contains('hidden'), 'N with no headlines yet does nothing');
+  check(press('n', 'KeyN') && el('news-modal').classList.contains('hidden'), `N with no headlines yet does nothing (${run('state.newsLog.length')} so far)`);
   const consumed = key('keydown', { target: TRADE });
   await wait(300);
   check(consumed && run('state.running') === false, 'Space works from the quantity field (pauses)');
@@ -237,9 +271,13 @@ function key(type, opts = {}) {
   await wait(300);
 
   // News modal: N toggles, and blocks everything else
-  const entry = `{id:1, headline:'Exchange Hacked', body:'B', target:'CRYPTO', impact:'CRASH', clock:'Day 2 - 10:00 AM', active:true}`;
+  const entry = `{id:1, headline:'Exchange Hacked', body:'B', impact:'CRASH', clock:'Day 2 - 10:00 AM', active:true,
+                  targets:[{target:'CRYPTO', direction:'DOWN'}, {target:'BTC', direction:'UP'}]}`;
   run(`handleMessage({type:'NEWS', news:${entry}, news_log:[${entry}]})`);
+  check(el('news-ticker').textContent.includes('(Crypto ▼, BTC ▲)') && el('news-log').innerHTML.includes('Crypto ▼, BTC ▲'),
+        `news names the markets it moves (${el('news-ticker').textContent})`);
   check(press('N', 'KeyN', { shiftKey: true }) && el('news-modal').classList.contains('flex'), 'Shift+N opens the live headline');
+  check(el('news-modal-meta').textContent.includes('Affects Crypto ▼, BTC ▲'), `news popup lists the markets (${el('news-modal-meta').textContent})`);
   await wait(300);
   check(run('state.running') === false, 'news popup pauses');
   check(!press('4', 'Digit4') && run('state.currentTab') === 'CRYPTO' && !press('Tab', 'Tab') && !press('`', 'Backquote')
@@ -265,16 +303,64 @@ function key(type, opts = {}) {
   await wait(300);
   check(run('state.running') === true, 'closing the modal resumes');
 
-  run('fastForward()');
-  await wait(400);
-  check(chartsMade === 1 && el('end-game-modal').classList.contains('flex') && el('status-pill').textContent === 'Week over', 'end report shown');
-  check(el('limit-order-list').innerHTML.includes('No pending orders'), 'week end cleared the resting order');
+  // Skip week: the real market runs fast to the next week, then pauses
+  check(!el('btn-skip-week').classList.contains('hidden') && !el('btn-skip-week').disabled, 'Skip week offered in week 1');
+  check(press('w', 'KeyW'), 'W is consumed');
+  await wait(300);
+  check(run('state.fastForward && state.fastForward.until') === 'WEEK' && el('status-pill').textContent === 'Skipping → Day 8'
+        && el('btn-skip-week').disabled && el('btn-skip-month').disabled, `skipping status (${el('status-pill').textContent})`);
+  check(await until(() => !run('state.running') && run('state.day') === 8, 15000), 'Skip week pauses at the next week');
+  check(el('clock-display').textContent === 'Week 2 · Day 8 - 09:00 AM' && el('status-pill').textContent === 'Paused',
+        `landed on Week 2, Day 8 (${el('clock-display').textContent})`);
+  check(run('state.newsLog.length') >= 1, 'news broke during the skip');
+  check(el('btn-skip-week').classList.contains('hidden'), 'no Skip week in the last week');
+  press('w', 'KeyW');
+  await wait(250);
+  check(run('state.fastForward') === null && !run('state.running'), 'W does nothing in the last week');
+
+  // Skip month: Space cancels it; then it plays out to the end
+  press('m', 'KeyM');  // confirm() is stubbed to OK
+  await until(() => run('state.fastForward'), 1000);
+  check(run('state.fastForward && state.fastForward.until') === 'END' && el('status-pill').textContent === 'Skipping → month end',
+        'M starts Skip month');
+  key('keydown');
+  await until(() => !run('state.running'), 1000);
+  check(run('state.fastForward') === null && !run('state.running') && !run('state.ended'), 'Space cancels a skip');
+  run('skipMonth()');
+  check(await until(() => run('state.ended'), 15000), 'Skip month plays out to the end');
+  await wait(300);
+  check(chartsMade === 2 && el('end-game-modal').classList.contains('flex') && el('status-pill').textContent === 'Month over',
+        `end report shown (${chartsMade} charts)`);
+  check(el('limit-order-list').innerHTML.includes('No pending orders'), 'month end cleared the resting order');
+
+  // Report: holdings and how prices reacted to each headline
+  const holdings = el('end-holdings').innerHTML;
+  check(holdings.includes('>TCHN<') && holdings.includes('>BTC<') && holdings.includes('Net worth') && holdings.includes('Cash'),
+        'report lists holdings, cash and net worth');
+  const events = run('state.reportEvents.length');
+  check(events >= 1 && el('end-event-tabs').innerHTML.includes('data-event-id') && el('end-event-table').innerHTML.includes('+24h')
+        && el('end-event-tabs').innerHTML.includes('border-blue-500'), `report shows event reactions (${events} headlines)`);
+  const reaction = charts[charts.length - 1];
+  check(reaction.data.labels.includes('0h') && reaction.data.labels[0] === '-6h'
+        && reaction.data.datasets.some(d => d.borderDash) && reaction.data.datasets.some(d => !d.borderDash),
+        `reaction chart: price paths plus dashed intended moves (${reaction.data.labels.slice(0, 3)})`);
+  if (events >= 2) {
+    run('selectReportEvent(state.reportEvents[1].id)');
+    check(chartsMade === 3 && charts[2].data.datasets[0].label === run('state.reportEvents[1].assets[0].symbol'),
+          'picking another headline redraws the chart');
+  }
+  check(!el('end-storyline').classList.contains('hidden') && el('end-storyline-title').textContent.length > 0
+        && el('end-storyline-summary').textContent.length > 0, `report reveals the storyline (${el('end-storyline-title').textContent})`);
+  run("switchTab('STOCK')");
+  check(dashed().length === 0 && avgLine() && overlay.markers.length === 1, 'cancelled order\'s line is gone, the holding\'s marks stay');
   run('newGame()');
   await wait(600);
   check(el('end-game-modal').classList.contains('hidden') && el('cash-display').textContent === '$10,000.00' && run('state.running'), 'play again resets');
+  check(lines().length === 0 && overlay.markers.length === 0, 'a new game clears the chart marks');
 
   check(chartCalls.errors.length === 0, `chart data ordering ${chartCalls.errors.slice(0, 3).join('; ')}`);
   check(errors.length === 0, `no runtime errors\n${errors.join('\n')}`);
+  reported = true;
   console.log(results.join('\n'));
   const passed = results.every((r) => r.startsWith('PASS'));
   console.log(passed ? '\nALL PASSED' : '\nSOME FAILED');

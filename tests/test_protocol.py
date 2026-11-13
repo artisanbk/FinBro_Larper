@@ -1,5 +1,6 @@
 """The /ws protocol against a live server, as the browser uses it."""
 
+import json
 import time
 
 import pytest
@@ -66,6 +67,9 @@ def test_market_order_while_paused(server):
             position = got["ACCOUNT"]["positions"][0]
             assert position["ticker"] == "TCHN" and position["qty"] == 40
             assert position["avg_cost"] == pytest.approx(result["fill"]["avg"])
+            [execution] = got["ACCOUNT"]["executions"]
+            assert execution["ticker"] == "TCHN" and execution["side"] == "BUY" and execution["qty"] == 40
+            assert execution["price"] == pytest.approx(result["fill"]["avg"])
             assert "TCHN" in got["TICK"]["updates"], "charts update even while paused"
             assert any(t[3] for t in got["BOOK"]["trades"]), "the book push includes the player's trades"
     run(body())
@@ -129,21 +133,49 @@ def test_second_client_sees_the_same_game(server):
     run(body())
 
 
-def test_fast_forward_and_new_game(server):
+def test_skip_month_plays_out_and_reports(server):
     async def body():
         async with connect(server) as ws:
             await recv_until(ws, "SNAPSHOT")
-            await fresh_game(ws)
+            await send(ws, action="NEW_GAME", seed=1, running=False, days=2)  # short, so the skip is quick
+            snapshot = await recv_until(ws, "SNAPSHOT", pred=lambda m: m["seed"] == 1)
+            assert snapshot["config"]["game_days"] == 2 and snapshot["day"] == 1 and snapshot["fast_forward"] is None
             await order(ws, ticker="TCHN", side="BUY", type="MARKET", quantity=1)
-            await send(ws, action="FAST_FORWARD")
-            report = await recv_until(ws, "GAME_OVER")
-            assert report["fees_paid"] == 5.0 and len(report["net_worth_history"]) >= 2
+            await send(ws, action="FAST_FORWARD", until="END")
+            status = await recv_until(ws, "STATUS")
+            assert status["running"] and status["fast_forward"] == {"until": "END", "target_day": 3}
+            tick = await recv_until(ws, "TICK")
+            assert tick["day"] >= 1 and len(tick["updates"]) >= 1
+            report = await recv_until(ws, "GAME_OVER", timeout=15)  # 2 days at 2 days a second
+            assert report["fees_paid"] == 5.0 and len(report["net_worth_history"]) >= 2 * 24
+            assert [h["ticker"] for h in report["holdings"]] == ["TCHN"] and report["cash"] < 10000
+            assert report["events"] and all(e["assets"] for e in report["events"])
             result = await order(ws, ticker="TCHN", side="BUY", type="MARKET", quantity=1)
             assert not result["ok"] and "over" in result["message"]
             await send(ws, action="NEW_GAME")
             snap = await recv_until(ws, "SNAPSHOT")
             assert snap["running"] and not snap["ended"] and snap["report"] is None
             assert snap["account"]["cash"] == 10000.0 and snap["account"]["positions"] == []
+    run(body())
+
+
+def test_new_game_can_pick_the_storyline(server):
+    async def body():
+        async with connect(server) as ws:
+            await recv_until(ws, "SNAPSHOT")
+            await send(ws, action="NEW_GAME", seed=3, running=False, storyline="chip_war", days=2)
+            snapshot = await recv_until(ws, "SNAPSHOT", pred=lambda m: m["seed"] == 3)
+            assert "chip_war" not in json.dumps(snapshot), "the storyline stays hidden while playing"
+            await send(ws, action="FAST_FORWARD")
+            report = await recv_until(ws, "GAME_OVER")
+            assert report["storyline"]["id"] == "chip_war" and report["storyline"]["title"] == "Chip War"
+            await send(ws, action="NEW_GAME", storyline="no_such_story")
+            error = await recv_until(ws, "ERROR")
+            assert "storyline" in error["message"]
+            await send(ws, action="NEW_GAME", days=40)
+            assert "days" in (await recv_until(ws, "ERROR"))["message"]
+            await send(ws, action="FAST_FORWARD", until="TOMORROW")
+            assert "until" in (await recv_until(ws, "ERROR"))["message"]
     run(body())
 
 

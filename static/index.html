@@ -35,13 +35,17 @@
                 <button onclick="togglePlay()" id="btn-play-pause" title="Play" class="text-slate-300 hover:text-white transition-colors disabled:opacity-40 disabled:cursor-not-allowed" disabled></button>
                 <span id="status-pill" class="text-xs font-semibold uppercase tracking-wider text-slate-500">Connecting</span>
                 <button onclick="toggleSound()" id="btn-sound" title="Fill sound: on" class="text-slate-400 hover:text-white transition-colors"></button>
-                <span title="Keyboard shortcuts&#10;Space: play / pause&#10;1-5: Stocks, ETFs, Crypto, REITs, Bonds&#10;Tab: quantity / limit price (value selected)&#10;Esc: leave the field (back to shortcuts)&#10;`: switch buy / sell&#10;\: switch market / limit&#10;Shift+Enter: execute the order&#10;N: open / close the news" class="text-slate-500 hover:text-slate-300 cursor-help" aria-label="Keyboard shortcuts">
+                <span title="Keyboard shortcuts&#10;Space: play / pause&#10;1-5: Stocks, ETFs, Crypto, REITs, Bonds&#10;Tab: quantity / limit price (value selected)&#10;Esc: leave the field (back to shortcuts)&#10;`: switch buy / sell&#10;\: switch market / limit&#10;Shift+Enter: execute the order&#10;N: open / close the news&#10;W: skip to next week&#10;M: skip to the end of the month" class="text-slate-500 hover:text-slate-300 cursor-help" aria-label="Keyboard shortcuts">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="2" y="6" width="20" height="12" rx="2"/><path stroke-linecap="round" d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M7 14h10"/></svg>
                 </span>
                 <div class="w-px h-4 bg-slate-700"></div>
-                <button onclick="fastForward()" id="btn-fast-forward" class="text-amber-400 hover:text-amber-300 transition-colors flex items-center gap-1 text-sm font-bold disabled:opacity-40 disabled:cursor-not-allowed" disabled>
+                <button onclick="skipWeek()" id="btn-skip-week" title="Fast-forward to next week (W)" class="text-amber-400 hover:text-amber-300 transition-colors flex items-center gap-1 text-sm font-bold disabled:opacity-40 disabled:cursor-not-allowed" disabled>
+                    <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path d="M4.555 5.168A1 1 0 003 6v8a1 1 0 001.555.832L10 11.202V14a1 1 0 001.555.832l6-4a1 1 0 000-1.664l-6-4A1 1 0 0010 6v2.798L4.555 5.168z"/></svg>
+                    Skip week
+                </button>
+                <button onclick="skipMonth()" id="btn-skip-month" title="Fast-forward to the end of the month (M)" class="text-amber-400 hover:text-amber-300 transition-colors flex items-center gap-1 text-sm font-bold disabled:opacity-40 disabled:cursor-not-allowed" disabled>
                     <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM7.029 6.029a1 1 0 00-1.029.029v7.94a1 1 0 001.55.83l5-3.97a1 1 0 000-1.658l-5-3.97a1 1 0 00-.521-.2z" clip-rule="evenodd"></path></svg>
-                    End Day 7
+                    Skip month
                 </button>
             </div>
         </div>
@@ -243,30 +247,57 @@
 
     <!-- End Game Modal -->
     <div id="end-game-modal" class="fixed inset-0 bg-slate-950/90 backdrop-blur-md z-50 hidden items-center justify-center p-4">
-        <div class="bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl max-w-4xl w-full p-6 md:p-8 flex flex-col h-[90vh]">
-            <h2 class="text-3xl font-black mb-2 text-center">Day 7: Performance Report</h2>
-            <p class="text-slate-400 text-center mb-6">The trading week has concluded. Here is how you performed.</p>
+        <div class="bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl max-w-5xl w-full p-6 md:p-8 flex flex-col max-h-[94vh]">
+            <h2 class="text-3xl font-black mb-2 text-center">Month-end Performance Report</h2>
+            <p class="text-slate-400 text-center mb-4">The trading month has concluded. Here is how you performed.</p>
 
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-                <div class="bg-slate-950 border border-slate-800 rounded-xl p-4 text-center">
-                    <div class="text-slate-400 text-xs font-bold uppercase mb-1">Final Net Worth</div>
-                    <div id="end-net-worth" class="text-3xl font-bold text-white">$0.00</div>
+            <div class="flex-1 min-h-0 overflow-y-auto pr-1 space-y-6">
+                <div id="end-storyline" class="hidden bg-slate-950 border border-slate-800 rounded-xl p-4 text-center">
+                    <div class="text-slate-400 text-xs font-bold uppercase mb-1">This month's storyline</div>
+                    <div id="end-storyline-title" class="text-xl font-bold text-blue-400"></div>
+                    <div id="end-storyline-summary" class="text-sm text-slate-400 mt-1"></div>
                 </div>
-                <div class="bg-slate-950 border border-slate-800 rounded-xl p-4 text-center">
-                    <div class="text-slate-400 text-xs font-bold uppercase mb-1">Total P/L</div>
-                    <div id="end-profit" class="text-3xl font-bold">$0.00</div>
+
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div class="bg-slate-950 border border-slate-800 rounded-xl p-4 text-center">
+                        <div class="text-slate-400 text-xs font-bold uppercase mb-1">Final Net Worth</div>
+                        <div id="end-net-worth" class="text-3xl font-bold text-white">$0.00</div>
+                    </div>
+                    <div class="bg-slate-950 border border-slate-800 rounded-xl p-4 text-center">
+                        <div class="text-slate-400 text-xs font-bold uppercase mb-1">Total P/L</div>
+                        <div id="end-profit" class="text-3xl font-bold">$0.00</div>
+                    </div>
+                    <div class="bg-slate-950 border border-slate-800 rounded-xl p-4 text-center">
+                        <div class="text-slate-400 text-xs font-bold uppercase mb-1">Total Fees Paid</div>
+                        <div id="end-fees" class="text-3xl font-bold text-red-400">$0.00</div>
+                    </div>
                 </div>
-                <div class="bg-slate-950 border border-slate-800 rounded-xl p-4 text-center">
-                    <div class="text-slate-400 text-xs font-bold uppercase mb-1">Total Fees Paid</div>
-                    <div id="end-fees" class="text-3xl font-bold text-red-400">$0.00</div>
-                </div>
+
+                <section>
+                    <h3 class="font-bold text-lg mb-2 text-slate-300">Net worth</h3>
+                    <div class="h-56 bg-slate-950 rounded-xl border border-slate-800 p-4 relative">
+                        <canvas id="pnl-chart"></canvas>
+                    </div>
+                </section>
+
+                <section>
+                    <h3 class="font-bold text-lg mb-2 text-slate-300">Your holdings</h3>
+                    <div id="end-holdings" class="bg-slate-950 rounded-xl border border-slate-800 p-4 overflow-x-auto"></div>
+                </section>
+
+                <section>
+                    <h3 class="font-bold text-lg mb-1 text-slate-300">How the market reacted</h3>
+                    <p class="text-xs text-slate-500 mb-3">Each asset's price change from just before the headline, hour by hour, from 6 hours before to 24 hours after. Dashed lines show how far the news should have moved each asset.</p>
+                    <div id="end-event-tabs" class="flex flex-wrap gap-2 mb-3"></div>
+                    <div id="end-event-note" class="text-xs text-amber-400 mb-2 hidden"></div>
+                    <div id="end-event-chart-box" class="h-64 bg-slate-950 rounded-xl border border-slate-800 p-4 relative">
+                        <canvas id="event-chart"></canvas>
+                    </div>
+                    <div id="end-event-table" class="mt-3 overflow-x-auto"></div>
+                </section>
             </div>
 
-            <div class="flex-1 min-h-0 bg-slate-950 rounded-xl border border-slate-800 p-4 mb-6 relative">
-                <canvas id="pnl-chart"></canvas>
-            </div>
-
-            <button onclick="newGame()" class="w-full md:w-auto md:mx-auto px-12 py-4 rounded-lg font-bold text-lg bg-blue-600 hover:bg-blue-500 text-white transition-all shadow-lg active:scale-95">
+            <button onclick="newGame()" class="mt-6 w-full md:w-auto md:mx-auto px-12 py-4 rounded-lg font-bold text-lg bg-blue-600 hover:bg-blue-500 text-white transition-all shadow-lg active:scale-95">
                 Play Again
             </button>
         </div>
@@ -294,16 +325,21 @@
             account: { cash: 0, fees_paid: 0, net_worth: 0, positions: [], orders: [] },
             book: null,        // latest BOOK message for the selected asset
             news: null,        // the active news-log entry, or null
-            newsLog: [],       // this week's headlines, oldest first
+            newsLog: [],       // this month's headlines, oldest first
             currentTab: 'STOCK',
             selectedSymbol: null,
             tradeMode: 'BUY',
             resumeAfterNews: false,
+            day: 1,              // in-game day, 1-based
+            fastForward: null,   // an active skip: { until: 'WEEK'|'END', target_day }
+            reportEvents: [],    // the report's event studies
+            reportEventId: null, // the one shown
         };
 
         let ws = null;
         let reconnectDelay = 500;
         let pnlChart = null;
+        let eventChart = null;
         let newsQuietTimer = null;
         let orderStatusTimer = null;
 
@@ -328,6 +364,37 @@
             time: c.time, value: c.volume || 0,
             color: c.close >= c.open ? 'rgba(34, 197, 94, 0.35)' : 'rgba(239, 68, 68, 0.35)',
         });
+
+        // The player's own trading on the chart: blue arrows at buy entries, a blue line at the
+        // average entry price, and faint gray dashed lines at pending limit orders.
+        const ENTRY_COLOR = '#3b82f6';
+        const LISTING_COLOR = 'rgba(203, 213, 225, 0.45)';
+        const tradeMarkers = LightweightCharts.createSeriesMarkers(candleSeries, []);
+        let overlayLines = [];
+
+        // Rebuilt only when the account or the selected asset changes, never per tick.
+        function renderChartOverlays() {
+            overlayLines.forEach(line => candleSeries.removePriceLine(line));
+            overlayLines = [];
+            const sym = state.selectedSymbol;
+            if (!sym) return;
+            tradeMarkers.setMarkers((state.account.executions || [])
+                .filter(e => e.ticker === sym && e.side === 'BUY')
+                .map(e => ({
+                    time: e.time, position: 'atPriceBottom', price: e.price, shape: 'arrowUp',
+                    color: ENTRY_COLOR, text: `B ${fmtQty(sym, e.qty)}`,
+                })));
+            const line = (options) => overlayLines.push(candleSeries.createPriceLine({ lineWidth: 1, ...options }));
+            const position = state.account.positions.find(p => p.ticker === sym);
+            if (position) {
+                line({ price: position.avg_cost, color: ENTRY_COLOR, lineStyle: LightweightCharts.LineStyle.Solid,
+                       axisLabelVisible: true, title: 'Avg entry' });
+            }
+            state.account.orders.filter(o => o.ticker === sym).forEach(o => {
+                line({ price: o.limit_price, color: LISTING_COLOR, lineStyle: LightweightCharts.LineStyle.Dashed,
+                       axisLabelVisible: false, title: `${o.side} ${fmtQty(sym, o.qty - o.filled)}` });
+            });
+        }
 
         // --- CONNECTION ---
         function connect() {
@@ -369,7 +436,12 @@
                     }
                     break;
                 case 'ACCOUNT': state.account = msg; renderAccount(); break;
-                case 'STATUS': state.running = msg.running; state.ended = msg.ended; renderStatus(); break;
+                case 'STATUS':
+                    state.running = msg.running;
+                    state.ended = msg.ended;
+                    state.fastForward = msg.fast_forward || null;
+                    renderStatus();
+                    break;
                 case 'NEWS': applyNews(msg.news, msg.news_log, true); break;
                 case 'ORDER_RESULT':
                     showOrderStatus(msg.message, msg.ok);
@@ -379,7 +451,14 @@
                     showOrderStatus(msg.message, true);
                     notifyFill(msg.fill);
                     break;
-                case 'GAME_OVER': state.running = false; state.ended = true; renderStatus(); applyNews(null, state.newsLog, false); showEndGame(msg); break;
+                case 'GAME_OVER':
+                    state.running = false;
+                    state.ended = true;
+                    state.fastForward = null;
+                    renderStatus();
+                    applyNews(null, state.newsLog, false);
+                    showEndGame(msg);
+                    break;
                 case 'ERROR': console.warn('Server error:', msg.message); break;
             }
         }
@@ -388,13 +467,15 @@
             state.config = msg.config;
             state.running = msg.running;
             state.ended = msg.ended;
+            state.fastForward = msg.fast_forward || null;
+            state.day = msg.day || 1;
             state.account = msg.account;
             state.assets = {};
             state.symbols = [];
             msg.assets.forEach(a => { state.assets[a.symbol] = a; state.symbols.push(a.symbol); });
             if (!state.assets[state.selectedSymbol]) state.selectedSymbol = state.symbols[0];
 
-            document.getElementById('clock-display').textContent = msg.clock;
+            renderClock(msg.clock);
             document.getElementById('preview-fee').textContent = formatMoney(state.config.fee);
             switchTab(state.assets[state.selectedSymbol].type, state.selectedSymbol);
             renderStatus();
@@ -403,25 +484,44 @@
             if (msg.report) showEndGame(msg.report); else hideEndGame();
         }
 
+        // "Week 2 · Day 9 - 09:00 AM"
+        function renderClock(clock) {
+            const week = Math.ceil(state.day / (state.config.days_per_week || 7));
+            document.getElementById('clock-display').textContent = `Week ${week} · ${clock}`;
+        }
+
+        const totalWeeks = () => Math.ceil((state.config.game_days || 28) / (state.config.days_per_week || 7));
+        const currentWeek = () => Math.ceil(state.day / (state.config.days_per_week || 7));
+
+        // Adds or replaces a candle at the end of an asset's history; false if it's older (already have it).
+        function upsertCandle(history, candle) {
+            const last = history[history.length - 1];
+            if (last && last.time === candle.time) history[history.length - 1] = candle;
+            else if (!last || candle.time > last.time) history.push(candle);
+            else return false;
+            return true;
+        }
+
         function applyTick(msg) {
-            document.getElementById('clock-display').textContent = msg.clock;
+            const weekBefore = currentWeek();
+            if (msg.day) state.day = msg.day;
+            renderClock(msg.clock);
+            if (currentWeek() !== weekBefore) renderStatus();  // e.g. Skip week isn't offered in the last week
             for (const [sym, update] of Object.entries(msg.updates)) {
                 const asset = state.assets[sym];
                 if (!asset) continue;
                 asset.price = update.price;
-                const history = asset.history;
-                if (history.length && history[history.length - 1].time === update.candle.time) {
-                    history[history.length - 1] = update.candle;
-                } else {
-                    history.push(update.candle);
+                const selected = sym === state.selectedSymbol;
+                // While skipping, one update spans several hours: apply every candle finished in between.
+                for (const candle of [...(update.completed || []), update.candle]) {
+                    if (upsertCandle(asset.history, candle) && selected) {
+                        candleSeries.update(candle);
+                        volumeSeries.update(volumeBar(candle));
+                    }
                 }
                 const priceEl = document.getElementById(`mw-price-${sym}`);
                 if (priceEl) priceEl.textContent = formatMoney(asset.price);
-                if (sym === state.selectedSymbol) {
-                    candleSeries.update(update.candle);
-                    volumeSeries.update(volumeBar(update.candle));
-                    document.getElementById('chart-price').textContent = formatMoney(asset.price);
-                }
+                if (selected) document.getElementById('chart-price').textContent = formatMoney(asset.price);
             }
             state.account.net_worth = msg.net_worth;
             renderHUD();
@@ -454,6 +554,7 @@
             document.getElementById('trade-tape').innerHTML = TAPE_WAITING;
             candleSeries.setData(asset.history);
             volumeSeries.setData(asset.history.map(volumeBar));
+            renderChartOverlays();
             state.book = null;
             renderBook();
             // The server then streams this asset's book and trades.
@@ -715,6 +816,7 @@
             renderHUD();
             renderHoldings();
             renderLimitOrders();
+            renderChartOverlays();
         }
 
         function renderHUD() {
@@ -806,8 +908,10 @@
             const btn = document.getElementById('btn-play-pause');
             const pill = document.getElementById('status-pill');
             let label = 'Paused', color = 'text-amber-400';
+            const ff = state.fastForward;
             if (!state.connected) { label = 'Offline'; color = 'text-red-400'; }
-            else if (state.ended) { label = 'Week over'; color = 'text-slate-400'; }
+            else if (state.ended) { label = 'Month over'; color = 'text-slate-400'; }
+            else if (ff) { label = ff.until === 'WEEK' ? `Skipping → Day ${ff.target_day}` : 'Skipping → month end'; color = 'text-amber-300'; }
             else if (state.running) { label = 'Live'; color = 'text-green-400'; }
             pill.textContent = label;
             pill.className = `text-xs font-semibold uppercase tracking-wider ${color}`;
@@ -815,7 +919,28 @@
             btn.title = state.running ? 'Pause (Space)' : 'Play (Space)';
             const disabled = !state.connected || state.ended;
             btn.disabled = disabled;
-            document.getElementById('btn-fast-forward').disabled = disabled;
+            const weekBtn = document.getElementById('btn-skip-week');
+            weekBtn.disabled = disabled || !!ff;
+            weekBtn.classList.toggle('hidden', !canSkipWeek(true));
+            document.getElementById('btn-skip-month').disabled = disabled || !!ff;
+        }
+
+        // Skip week isn't offered in the last week (Skip month covers it). ignoreBusy: just "is it offered".
+        function canSkipWeek(ignoreBusy) {
+            if (currentWeek() >= totalWeeks()) return false;
+            return ignoreBusy || (state.connected && !state.ended && !state.fastForward);
+        }
+
+        // Both skips run the real market at high speed: news still breaks and orders still fill.
+        function skipWeek() {
+            if (canSkipWeek(false)) send({ action: 'FAST_FORWARD', until: 'WEEK' });
+        }
+
+        function skipMonth() {
+            if (!state.connected || state.ended || state.fastForward) return;
+            if (confirm('Fast-forward to the end of the month? The market plays out at high speed, then you get your report.')) {
+                send({ action: 'FAST_FORWARD', until: 'END' });
+            }
         }
 
         function togglePlay() {
@@ -824,7 +949,7 @@
 
         // --- KEYBOARD SHORTCUTS ---
         // Space: play/pause · 1-5: asset tabs · Tab: quantity <-> limit price · Esc: leave the field ·
-        // `: buy/sell · \: market/limit · Shift+Enter: execute · N: news.
+        // `: buy/sell · \: market/limit · Shift+Enter: execute · N: news · W: skip week · M: skip month.
         // Like vim: a focused trade field is "insert mode" (digits type); Esc returns to "normal mode".
         // Digits type normally in the quantity/limit fields; the other shortcuts still work there,
         // since a number field has no use for them. Modifier combos (Ctrl+1 etc.) are left alone.
@@ -862,7 +987,7 @@
             if (leavingLimit && document.activeElement === limitField) cycleTradeField(false);
         }
 
-        // N: close the news if it's open; otherwise open the live headline, or the latest one this week.
+        // N: close the news if it's open; otherwise open the live headline, or the latest one this month.
         function toggleNewsModal() {
             if (isOpen('news-modal')) return closeNewsModal();
             if (state.news) return openNewsModal();
@@ -897,6 +1022,12 @@
             } else if ((e.code === 'Backquote' || key === '`' || key === '~') && !ctx.blocked) {
                 e.preventDefault();
                 if (!e.repeat) setTradeMode(state.tradeMode === 'BUY' ? 'SELL' : 'BUY');
+            } else if (key.toLowerCase() === 'w' && !ctx.blocked) {
+                e.preventDefault();
+                if (!e.repeat) skipWeek();
+            } else if (key.toLowerCase() === 'm' && !ctx.blocked) {
+                e.preventDefault();
+                if (!e.repeat) skipMonth();
             } else if (/^[1-5]$/.test(key) && !ctx.inTradeField && !ctx.blocked) {
                 e.preventDefault();
                 if (!e.repeat) switchTab(TAB_TYPES[Number(key) - 1]);
@@ -969,11 +1100,7 @@
                 el.classList.add('opacity-0');
                 setTimeout(() => el.remove(), 300);
             }, 3000);
-            ping(fill.side);
-        }
-
-        function fastForward() {
-            if (confirm('End the trading week now and see your performance report?')) send({ action: 'FAST_FORWARD' });
+            if (!state.fastForward) ping(fill.side);  // a skip can fill many orders; just show the toasts
         }
 
         function newGame() {
@@ -982,6 +1109,13 @@
 
         // --- NEWS ---
         const NEWS_TARGETS = { GLOBAL: 'All markets', STOCK: 'Stocks', ETF: 'ETFs', CRYPTO: 'Crypto', REIT: 'REITs', BOND: 'Bonds' };
+
+        // "Crypto ▼, BTC ▲": the markets a headline moves (asset classes or single symbols), and which way.
+        function newsTargets(entry) {
+            return (entry.targets || [])
+                .map(t => `${NEWS_TARGETS[t.target] || t.target} ${t.direction === 'UP' ? '▲' : '▼'}`)
+                .join(', ');
+        }
         const QUIET_NEWS = 'No breaking news. Markets are trading normally.';
         const NEWS_TAB_BASE = 'text-white text-xs font-bold px-4 py-2 uppercase tracking-wider whitespace-nowrap z-10';
         const NEWS_TICKER_BASE = 'absolute whitespace-nowrap text-sm font-medium px-4 transition-colors';
@@ -999,7 +1133,7 @@
                 tab.textContent = crash ? 'Crash Alert' : 'Breaking';
                 tab.className = `${crash ? 'bg-red-600' : 'bg-green-600'} ${NEWS_TAB_BASE} animate-pulse`;
                 const ticker = document.getElementById('news-ticker');
-                ticker.textContent = `BREAKING: ${news.headline} (${NEWS_TARGETS[news.target]}) — click for details`;
+                ticker.textContent = `BREAKING: ${news.headline} (${newsTargets(news)}) — click for details`;
                 ticker.className = `${NEWS_TICKER_BASE} animate-marquee cursor-pointer text-white hover:text-blue-400`;
             } else if (hadNews && live) {
                 setQuietNews('Markets stabilizing...');
@@ -1022,9 +1156,9 @@
         function renderNewsLog() {
             const list = document.getElementById('news-log');
             const n = state.newsLog.length;
-            document.getElementById('news-count').textContent = `${n} headline${n === 1 ? '' : 's'} this week`;
+            document.getElementById('news-count').textContent = `${n} headline${n === 1 ? '' : 's'} this month`;
             if (n === 0) {
-                list.innerHTML = '<div class="text-slate-500 text-sm italic">No headlines yet. Major market events break between Day 2 and Day 6.</div>';
+                list.innerHTML = '<div class="text-slate-500 text-sm italic">No headlines yet. This month\'s story will unfold as the days go by.</div>';
                 return;
             }
             list.innerHTML = [...state.newsLog].reverse().map(e => {
@@ -1033,7 +1167,7 @@
                 return `
                 <button type="button" data-news-id="${e.id}" class="w-full text-left p-2 rounded-lg bg-slate-950 border ${border} hover:bg-slate-800/50 transition-colors">
                     <div class="flex justify-between items-center gap-2 text-xs mb-1">
-                        <span class="font-bold ${crash ? 'text-red-400' : 'text-green-400'}">${crash ? '▼ Crash' : '▲ Boom'} · ${NEWS_TARGETS[e.target]}</span>
+                        <span class="font-bold ${crash ? 'text-red-400' : 'text-green-400'}">${crash ? '▼ Crash' : '▲ Boom'} · ${newsTargets(e)}</span>
                         <span class="text-slate-500 whitespace-nowrap">${e.active ? '<span class="text-amber-400 font-bold">LIVE</span> · ' : ''}${e.clock}</span>
                     </div>
                     <div class="text-sm text-white">${e.headline}</div>
@@ -1054,7 +1188,7 @@
             if (state.running) send({ action: 'PAUSE' });
             document.getElementById('news-modal-headline').textContent = entry.headline;
             document.getElementById('news-modal-meta').textContent =
-                `${entry.clock} · Affects ${NEWS_TARGETS[entry.target]} · ${entry.active ? 'Developing now' : 'Ended'}`;
+                `${entry.clock} · Affects ${newsTargets(entry)} · ${entry.active ? 'Developing now' : 'Ended'}`;
             document.getElementById('news-modal-body').textContent = entry.body;
             document.getElementById('news-modal-header').className = `${entry.impact === 'CRASH' ? 'bg-red-600' : 'bg-green-600'} p-4`;
             document.getElementById('btn-close-news').textContent = state.resumeAfterNews ? 'Close & Resume' : 'Close';
@@ -1078,6 +1212,12 @@
             profitEl.textContent = (report.profit >= 0 ? '+' : '') + formatMoney(report.profit);
             profitEl.className = `text-3xl font-bold ${report.profit >= 0 ? 'text-green-400' : 'text-red-400'}`;
             document.getElementById('end-fees').textContent = formatMoney(report.fees_paid);
+            const story = document.getElementById('end-storyline');
+            story.classList.toggle('hidden', !report.storyline);
+            if (report.storyline) {
+                document.getElementById('end-storyline-title').textContent = report.storyline.title;
+                document.getElementById('end-storyline-summary').textContent = report.storyline.summary;
+            }
 
             const modal = document.getElementById('end-game-modal');
             modal.classList.remove('hidden');
@@ -1087,7 +1227,7 @@
             pnlChart = new Chart(document.getElementById('pnl-chart'), {
                 type: 'line',
                 data: {
-                    labels: report.net_worth_history.map((_, i) => `Hr ${i}`),
+                    labels: report.net_worth_history.map((_, i) => `Day ${Math.floor(i / 24) + 1}`),  // hourly points
                     datasets: [{
                         label: 'Portfolio Value',
                         data: report.net_worth_history,
@@ -1103,11 +1243,163 @@
                     responsive: true, maintainAspectRatio: false,
                     plugins: { legend: { display: false } },
                     scales: {
-                        x: { display: false },
+                        x: { grid: { display: false }, ticks: { color: '#94a3b8', maxTicksLimit: 8 } },
                         y: { grid: { color: '#1e293b' }, ticks: { color: '#94a3b8' } },
                     },
                 },
             });
+            renderEndHoldings(report);
+            state.reportEvents = report.events || [];
+            selectReportEvent(state.reportEvents.length ? state.reportEvents[0].id : null);
+        }
+
+        const pct = (x, digits = 1) => x === null || x === undefined ? '—' : `${x >= 0 ? '+' : ''}${(x * 100).toFixed(digits)}%`;
+        const plClass = (x) => x >= 0 ? 'text-green-400' : 'text-red-400';
+
+        // Feature: the report lists what the player ends the month holding, at final prices.
+        function renderEndHoldings(report) {
+            const el = document.getElementById('end-holdings');
+            const holdings = report.holdings || [];
+            const cash = report.cash ?? 0;
+            if (!holdings.length) {
+                el.innerHTML = `<div class="text-slate-400 text-sm">You ended the month in cash: <span class="text-white font-bold">${formatMoney(cash)}</span>.</div>`;
+                return;
+            }
+            const cell = 'py-1.5 px-2 text-right font-mono';
+            el.innerHTML = `
+                <table class="w-full text-sm">
+                    <thead><tr class="text-xs text-slate-500 uppercase tracking-wider">
+                        <th class="py-1 px-2 text-left">Asset</th><th class="py-1 px-2 text-right">Quantity</th>
+                        <th class="py-1 px-2 text-right">Avg cost</th><th class="py-1 px-2 text-right">Final price</th>
+                        <th class="py-1 px-2 text-right">Value</th><th class="py-1 px-2 text-right">P/L</th>
+                    </tr></thead>
+                    <tbody>
+                        ${holdings.map(h => `
+                        <tr class="border-t border-slate-800">
+                            <td class="py-1.5 px-2"><span class="font-bold text-white">${h.ticker}</span> <span class="text-xs text-slate-500">${h.name}</span></td>
+                            <td class="${cell}">${fmtQty(h.ticker, h.qty)}</td>
+                            <td class="${cell}">${formatMoney(h.avg_cost)}</td>
+                            <td class="${cell}">${formatMoney(h.price)}</td>
+                            <td class="${cell} text-white">${formatMoney(h.value)}</td>
+                            <td class="${cell} ${plClass(h.pl)}">${h.pl >= 0 ? '+' : ''}${formatMoney(h.pl)} (${h.pl_pct >= 0 ? '+' : ''}${h.pl_pct.toFixed(2)}%)</td>
+                        </tr>`).join('')}
+                        <tr class="border-t border-slate-800">
+                            <td class="py-1.5 px-2 text-slate-400" colspan="4">Cash</td>
+                            <td class="${cell} text-white">${formatMoney(cash)}</td><td></td>
+                        </tr>
+                        <tr class="border-t border-slate-700 font-bold">
+                            <td class="py-1.5 px-2" colspan="4">Net worth</td>
+                            <td class="${cell} text-white">${formatMoney(report.net_worth)}</td><td></td>
+                        </tr>
+                    </tbody>
+                </table>`;
+        }
+
+        // Feature: how prices reacted to each headline (an event study). Rebuilt only with the report.
+        const SERIES_COLORS = ['#3b82f6', '#f59e0b', '#22c55e', '#ef4444', '#a855f7', '#14b8a6', '#ec4899', '#eab308'];
+
+        function renderEventTabs() {
+            const tabs = document.getElementById('end-event-tabs');
+            if (!state.reportEvents.length) {
+                tabs.innerHTML = '<div class="text-slate-500 text-sm italic">No headlines broke this month.</div>';
+                return;
+            }
+            tabs.innerHTML = state.reportEvents.map(e => `
+                <button type="button" data-event-id="${e.id}" class="px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${
+                    e.id === state.reportEventId ? 'bg-slate-800 border-blue-500 text-white' : 'border-slate-700 text-slate-300 hover:bg-slate-800'}">
+                    <span class="${e.impact === 'CRASH' ? 'text-red-400' : 'text-green-400'}">${e.impact === 'CRASH' ? '▼' : '▲'}</span>
+                    ${e.headline}${e.rumor ? ' <span class="text-amber-400">(rumor)</span>' : ''}
+                </button>`).join('');
+        }
+
+        document.getElementById('end-event-tabs').addEventListener('click', (e) => {
+            const tab = e.target.closest('[data-event-id]');
+            if (tab) selectReportEvent(Number(tab.dataset.eventId));
+        });
+
+        // A dotted vertical line at the hour the headline broke.
+        const headlineMarker = {
+            id: 'headlineMarker',
+            afterDatasetsDraw(chart) {
+                const x = chart.scales.x.getPixelForValue(chart.data.labels.indexOf('0h'));
+                const { top, bottom } = chart.chartArea;
+                const ctx = chart.ctx;
+                ctx.save();
+                ctx.strokeStyle = 'rgba(148, 163, 184, 0.6)';
+                ctx.setLineDash([2, 3]);
+                ctx.beginPath();
+                ctx.moveTo(x, top);
+                ctx.lineTo(x, bottom);
+                ctx.stroke();
+                ctx.restore();
+            },
+        };
+
+        function selectReportEvent(id) {
+            const event = state.reportEvents.find(e => e.id === id);
+            state.reportEventId = id;
+            renderEventTabs();  // rebuilt only on a click, so its buttons stay clickable
+            const note = document.getElementById('end-event-note');
+            const table = document.getElementById('end-event-table');
+            const box = document.getElementById('end-event-chart-box');
+            if (eventChart) { eventChart.destroy(); eventChart = null; }
+            box.classList.toggle('hidden', !event);
+            if (!event) { table.innerHTML = ''; note.classList.add('hidden'); return; }
+            note.classList.toggle('hidden', !event.rumor);
+            note.textContent = event.rumor ? 'This headline was a rumor: it excited traders but changed no true value, so prices should drift back toward 0%.' : '';
+
+            const hours = [...new Set(event.assets.flatMap(a => a.path.map(([h]) => h)))].sort((a, b) => a - b);
+            const labels = hours.map(h => `${h > 0 ? '+' : ''}${h}h`);
+            const datasets = event.assets.flatMap((a, i) => {
+                const color = SERIES_COLORS[i % SERIES_COLORS.length];
+                const byHour = Object.fromEntries(a.path);
+                return [
+                    { label: a.symbol, data: hours.map(h => h in byHour ? byHour[h] * 100 : null), borderColor: color,
+                      backgroundColor: color, borderWidth: 2, pointRadius: 0, tension: 0.2, spanGaps: true },
+                    { label: `${a.symbol} intended`, data: hours.map(() => a.expected * 100), borderColor: color,
+                      borderWidth: 1, borderDash: [6, 4], pointRadius: 0 },
+                ];
+            });
+            eventChart = new Chart(document.getElementById('event-chart'), {
+                type: 'line',
+                data: { labels, datasets },
+                options: {
+                    responsive: true, maintainAspectRatio: false, animation: false,
+                    interaction: { mode: 'index', intersect: false },
+                    plugins: {
+                        legend: { labels: { color: '#cbd5e1', boxWidth: 12, filter: (item) => !item.text.endsWith('intended') } },
+                        tooltip: { callbacks: { label: (c) => `${c.dataset.label}: ${c.parsed.y >= 0 ? '+' : ''}${c.parsed.y.toFixed(2)}%` } },
+                    },
+                    scales: {
+                        x: { grid: { color: '#1e293b' }, ticks: { color: '#94a3b8', maxTicksLimit: 11 } },
+                        y: { grid: { color: '#1e293b' }, ticks: { color: '#94a3b8', callback: (v) => `${v}%` } },
+                    },
+                },
+                plugins: [headlineMarker],
+            });
+
+            const cell = 'py-1.5 px-2 text-right font-mono';
+            table.innerHTML = `
+                <table class="w-full text-sm">
+                    <thead><tr class="text-xs text-slate-500 uppercase tracking-wider">
+                        <th class="py-1 px-2 text-left">Asset</th>
+                        <th class="py-1 px-2 text-right" title="How far the news should move the asset's true value">Intended</th>
+                        <th class="py-1 px-2 text-right" title="By now the news is fully priced into value">+2h</th>
+                        <th class="py-1 px-2 text-right" title="The excited trading has ended">+6h</th>
+                        <th class="py-1 px-2 text-right" title="Did the move stick?">+24h</th>
+                        <th class="py-1 px-2 text-right" title="The biggest move within 24 hours">Peak</th>
+                        <th class="py-1 px-2 text-right" title="Trading volume in the 6 hours after vs. the 24 hours before">Volume ×</th>
+                    </tr></thead>
+                    <tbody>${event.assets.map((a, i) => `
+                        <tr class="border-t border-slate-800">
+                            <td class="py-1.5 px-2 font-bold" style="color: ${SERIES_COLORS[i % SERIES_COLORS.length]}">${a.symbol}</td>
+                            <td class="${cell} text-slate-400">${pct(a.expected)}</td>
+                            ${[a.at_2h, a.at_6h, a.at_24h, a.peak].map(x => `<td class="${cell} ${x === null ? 'text-slate-500' : plClass(x)}">${pct(x)}</td>`).join('')}
+                            <td class="${cell} text-slate-300">${a.volume_x === null ? '—' : `${a.volume_x.toFixed(1)}×`}</td>
+                        </tr>`).join('')}
+                    </tbody>
+                </table>
+                <p class="text-xs text-slate-500 mt-2">Broke ${event.clock}. Hour 0 is the hour the headline broke in.</p>`;
         }
 
         function hideEndGame() {
@@ -1115,6 +1407,7 @@
             modal.classList.add('hidden');
             modal.classList.remove('flex');
             if (pnlChart) { pnlChart.destroy(); pnlChart = null; }
+            if (eventChart) { eventChart.destroy(); eventChart = null; }
         }
 
         // --- UTILS ---

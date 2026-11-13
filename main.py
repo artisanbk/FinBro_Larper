@@ -11,8 +11,8 @@ from fastapi.staticfiles import StaticFiles
 
 import models  # noqa: F401  (registers the tables on Base.metadata)
 from database import Base, engine
-from config import TICK_SECONDS
-from game import Game
+from config import GAME_DAYS, TICK_SECONDS
+from game import STORYLINES_BY_ID, Game
 
 logger = logging.getLogger("finbro_larper")
 # In a PyInstaller build, bundled files are unpacked to sys._MEIPASS rather than next to this module.
@@ -143,13 +143,26 @@ def handle_action(client: Client, game: Game, payload: dict) -> None:
                 broadcast(update)
             push_books(game)
     elif action == "FAST_FORWARD":
-        for message in game.fast_forward():
+        until = payload.get("until", "END")  # WEEK: to the start of the next week; END: to the month's end
+        if until not in ("WEEK", "END"):
+            client.push({"type": "ERROR", "message": "FAST_FORWARD until must be WEEK or END."})
+            return
+        for message in game.fast_forward(until):
             broadcast(message)
     elif action == "NEW_GAME":
         seed = payload.get("seed")
         running = payload.get("running", True)  # false: start paused, e.g. for an exact seeded replay
+        storyline = payload.get("storyline")    # a config.STORYLINES id; otherwise the seed picks one
+        days = payload.get("days", GAME_DAYS)   # a shorter game, e.g. for tests
+        if storyline is not None and storyline not in STORYLINES_BY_ID:
+            client.push({"type": "ERROR", "message": f"Unknown storyline: {storyline!r}"})
+            return
+        if isinstance(days, bool) or not isinstance(days, int) or not 1 <= days <= GAME_DAYS:
+            client.push({"type": "ERROR", "message": f"days must be a whole number from 1 to {GAME_DAYS}."})
+            return
         game.new_game(running=running is not False,
-                      seed=seed if isinstance(seed, int) and not isinstance(seed, bool) else None)
+                      seed=seed if isinstance(seed, int) and not isinstance(seed, bool) else None,
+                      storyline=storyline, days=days)
         for c in clients:
             c.trade_seq = 0
         broadcast(game.snapshot())  # pages re-subscribe to their asset on SNAPSHOT
@@ -195,7 +208,7 @@ async def market_simulation_loop(game: Game) -> None:
     next_tick = loop.time()
     while True:
         try:
-            messages = game.advance()
+            messages = game.frame()
             for message in messages:
                 broadcast(message)
             if messages:

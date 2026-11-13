@@ -13,7 +13,7 @@ from collections import deque
 
 from config import (
     BOOK_LEVELS, LOT_NOTIONAL, MARKET_ORDER_BAND, NEWS_DIFFUSION_TICKS, NEWS_DURATION_TICKS,
-    TICKS_PER_DAY, Profile,
+    TICKS_PER_DAY, TICKS_PER_WEEK, Profile,
 )
 from orderbook import BUY, SELL, Fill, OrderBook
 
@@ -36,7 +36,7 @@ def true_value_path(price: float, profile: Profile, events: list[dict], rng: ran
                     n_ticks: int) -> list[float]:
     """Pre-generate the asset's true value for every tick: drift + noise + news shifts."""
     sigma = profile.daily_vol / math.sqrt(TICKS_PER_DAY)
-    mu = math.log(1 + profile.weekly_drift) / n_ticks
+    mu = math.log(1 + profile.weekly_drift) / TICKS_PER_WEEK
     shift = [0.0] * (n_ticks + 1)
     vol_mult = [1.0] * (n_ticks + 1)
     for event in events:
@@ -242,6 +242,7 @@ class Market:
         self.candle = {"time": start_unix, "open": spec["price"], "high": spec["price"],
                        "low": spec["price"], "close": spec["price"], "volume": 0}
         self.completed: list[dict] = []  # candles finished since the game last saved them
+        self.unreported: list[dict] = []  # candles finished since the game last sent an update
 
         self.traded = False  # set by any trade; the game clears it after reporting
         self.trade_seq = 0
@@ -332,6 +333,7 @@ class Market:
         if self.candle["time"] != self.period:
             self.history.append(self.candle)
             self.completed.append(self.candle)
+            self.unreported.append(self.candle)
             prev = self.candle["close"]
             self.candle = {"time": self.period, "open": prev, "high": prev, "low": prev, "close": prev, "volume": 0}
         c = self.candle
@@ -374,6 +376,10 @@ class Market:
         self.rng.shuffle(acting)
         for agent in acting:
             agent.act(tick, sentiment)
+        # A big sweep can clear one side; a real market maker re-quotes at once rather than leaving
+        # the book one-sided until its next refresh.
+        if self.book.best(BUY) is None or self.book.best(SELL) is None:
+            self.market_maker.act(tick, sentiment)
 
         mid = self.mid()
         ret = math.log(mid / self.smoothed)

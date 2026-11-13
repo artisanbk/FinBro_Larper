@@ -11,19 +11,23 @@ import statistics
 import pytest
 
 import game as g
-from config import GAME_TICKS, NEWS_DURATION_TICKS, PROFILES
+from config import NEWS_DURATION_TICKS, PROFILES
 from orderbook import BUY, SELL
 
-SEEDS = (1000, 1001, 1002)
+# (seed, storyline): the storylines with the biggest moves, including a symbol-only event (chip_war)
+# and large REIT moves (housing_squeeze), the least active market.
+WEEKS = ((1000, "crypto_winter"), (1001, "chip_war"), (1002, "housing_squeeze"))
 
 
-def simulate(seed):
-    game = g.Game(seed=seed)
+def simulate(seed, storyline=None, days=7):
+    # Week-long games keep the suite quick; a storyline scales to the game's length, so a week
+    # packs a month's events closer together, which is the harder case.
+    game = g.Game(seed=seed, storyline=storyline, days=days)
     game.running = True
     stats = {sym: {"dev": [], "spread": [], "empty": 0} for sym in game.markets}
     before = {}
     reactions = []  # (symbol, headline, price move, true-value move) over each event's window
-    for _ in range(GAME_TICKS - 1):
+    for _ in range(game.total_ticks - 1):
         game.advance()
         t = game.tick
         for sym, m in game.markets.items():
@@ -36,7 +40,7 @@ def simulate(seed):
                 s["spread"].append((ask - bid) / ((ask + bid) / 2) * 1e4)
             for event in game.scheduled_news:
                 start = event["trigger_tick"]
-                if event["target"] not in ("GLOBAL", m.type):
+                if event["rumor"] or not g.asset_move(event["effects"], sym, m.type):
                     continue
                 if t == start - 1:
                     before[(sym, start)] = (m.price, m.true_value[t])
@@ -48,7 +52,7 @@ def simulate(seed):
 
 @pytest.fixture(scope="module")
 def weeks():
-    return [simulate(seed) for seed in SEEDS]
+    return [simulate(seed, storyline) for seed, storyline in WEEKS]
 
 
 def test_prices_track_the_true_value(weeks):

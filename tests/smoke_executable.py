@@ -61,13 +61,20 @@ async def recv(ws, msg_type: str, timeout: float = 10.0) -> dict:
 async def play(port: int) -> None:
     async with websockets.connect(f"ws://127.0.0.1:{port}/ws", max_size=None) as ws:
         snapshot = await recv(ws, "SNAPSHOT")
-        assert len(snapshot["assets"]) == 8, snapshot["assets"]
+        assert len(snapshot["assets"]) == 8 and snapshot["config"]["game_days"] == 28, snapshot["config"]
+        # A one-day game, so Skip month plays out in about a second.
+        await ws.send(json.dumps({"action": "NEW_GAME", "seed": 1, "days": 1, "running": False}))
+        await recv(ws, "SNAPSHOT")
         await ws.send(json.dumps({"action": "ORDER", "ticker": "TCHN", "side": "BUY", "type": "MARKET", "quantity": 1}))
         result = await recv(ws, "ORDER_RESULT")
         assert result["ok"], result
         await ws.send(json.dumps({"action": "PLAY"}))
         tick = await recv(ws, "TICK")
         print(f"ok   traded and ticked: {result['message']} / clock {tick['clock']}")
+        await ws.send(json.dumps({"action": "FAST_FORWARD", "until": "END"}))
+        report = await recv(ws, "GAME_OVER", timeout=20)
+        assert [h["ticker"] for h in report["holdings"]] == ["TCHN"] and report["storyline"]["title"], report
+        print(f"ok   skipped to the end: {report['storyline']['title']}, {len(report['events'])} headlines in the report")
 
 
 def stop(process: subprocess.Popen) -> None:
