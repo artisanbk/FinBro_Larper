@@ -309,7 +309,7 @@ function key(type, opts = {}) {
   await wait(300);
   check(run('state.fastForward && state.fastForward.until') === 'WEEK' && el('status-pill').textContent === 'Skipping → Day 8'
         && el('btn-skip-week').disabled && el('btn-skip-month').disabled, `skipping status (${el('status-pill').textContent})`);
-  check(await until(() => !run('state.running') && run('state.day') === 8, 15000), 'Skip week pauses at the next week');
+  check(await until(() => !run('state.running') && run('state.day') === 8, 60000), 'Skip week pauses at the next week');
   check(el('clock-display').textContent === 'Week 2 · Day 8 - 09:00 AM' && el('status-pill').textContent === 'Paused',
         `landed on Week 2, Day 8 (${el('clock-display').textContent})`);
   check(run('state.newsLog.length') >= 1, 'news broke during the skip');
@@ -327,7 +327,7 @@ function key(type, opts = {}) {
   await until(() => !run('state.running'), 1000);
   check(run('state.fastForward') === null && !run('state.running') && !run('state.ended'), 'Space cancels a skip');
   run('skipMonth()');
-  check(await until(() => run('state.ended'), 15000), 'Skip month plays out to the end');
+  check(await until(() => run('state.ended'), 60000), 'Skip month plays out to the end');
   await wait(300);
   check(chartsMade === 2 && el('end-game-modal').classList.contains('flex') && el('status-pill').textContent === 'Month over',
         `end report shown (${chartsMade} charts)`);

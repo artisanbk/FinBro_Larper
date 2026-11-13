@@ -3,7 +3,7 @@ import sys
 import tempfile
 from pathlib import Path
 
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, event
 from sqlalchemy.orm import sessionmaker, declarative_base
 
 if os.environ.get("FINBRO_LARPER_DB"):
@@ -21,5 +21,15 @@ SQLALCHEMY_DATABASE_URL = f"sqlite:///{DB_PATH}"
 engine = create_engine(
     SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False}
 )
+
+
+@event.listens_for(engine, "connect")
+def _fast_writes(dbapi_connection, _record) -> None:
+    # The database is rebuilt on every start, so surviving a crash mid-write buys nothing. Skipping
+    # the disk sync keeps commits cheap: on Windows they made skips (many commits a second) crawl.
+    cursor = dbapi_connection.cursor()
+    cursor.execute("PRAGMA synchronous=OFF")
+    cursor.execute("PRAGMA journal_mode=MEMORY")
+    cursor.close()
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()

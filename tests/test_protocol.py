@@ -146,7 +146,7 @@ def test_skip_month_plays_out_and_reports(server):
             assert status["running"] and status["fast_forward"] == {"until": "END", "target_day": 3}
             tick = await recv_until(ws, "TICK")
             assert tick["day"] >= 1 and len(tick["updates"]) >= 1
-            report = await recv_until(ws, "GAME_OVER", timeout=15)  # 2 days at 2 days a second
+            report = await recv_until(ws, "GAME_OVER", timeout=30)  # 2 days at 2 days a second; slow CI runners lag
             assert report["fees_paid"] == 5.0 and len(report["net_worth_history"]) >= 2 * 24
             assert [h["ticker"] for h in report["holdings"]] == ["TCHN"] and report["cash"] < 10000
             assert report["events"] and all(e["assets"] for e in report["events"])
@@ -167,7 +167,7 @@ def test_new_game_can_pick_the_storyline(server):
             snapshot = await recv_until(ws, "SNAPSHOT", pred=lambda m: m["seed"] == 3)
             assert "chip_war" not in json.dumps(snapshot), "the storyline stays hidden while playing"
             await send(ws, action="FAST_FORWARD")
-            report = await recv_until(ws, "GAME_OVER")
+            report = await recv_until(ws, "GAME_OVER", timeout=30)  # CI's Windows runner is several times slower
             assert report["storyline"]["id"] == "chip_war" and report["storyline"]["title"] == "Chip War"
             await send(ws, action="NEW_GAME", storyline="no_such_story")
             error = await recv_until(ws, "ERROR")

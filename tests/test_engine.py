@@ -1,11 +1,14 @@
 """Game engine: reproducibility, the player's orders and account, news, the clock."""
 
+import math
+
 import pytest
 
 import game as g
 from config import (
     FEE_PER_ORDER, GAME_TICKS, INITIAL_ASSETS, NEWS_DIFFUSION_TICKS, NEWS_DURATION_TICKS, NEWS_SENTIMENT, PROFILES,
-    STARTING_CASH, STORYLINES, TICKS_PER_DAY, TICKS_PER_HOUR, TICKS_PER_WEEK, WILDCARD_WINDOW, WILDCARDS,
+    FF_TICKS_PER_FRAME, STARTING_CASH, STORYLINES, TICKS_PER_DAY, TICKS_PER_HOUR, TICKS_PER_WEEK, WILDCARD_WINDOW,
+    WILDCARDS,
 )
 from market import PLAYER
 from orderbook import BUY, SELL
@@ -436,7 +439,8 @@ def run_skip(game, until, max_frames=10_000):
     return frames
 
 
-def test_skip_week_plays_the_market_to_the_next_week_and_pauses():
+def test_skip_week_plays_the_market_to_the_next_week_and_pauses(monkeypatch):
+    monkeypatch.setattr(g, "FF_FRAME_BUDGET", 60.0)  # so frame sizes don't depend on this machine's speed
     game = new(seed=4, running=True)
     for _ in range(100):
         game.advance()
@@ -445,11 +449,31 @@ def test_skip_week_plays_the_market_to_the_next_week_and_pauses():
     assert game.tick == TICKS_PER_WEEK and not game.running and not game.ended and game.day() == 8
     assert frames[-1][-1] == {"type": "STATUS", "running": False, "ended": False, "fast_forward": None}
     assert all(sum(m["type"] == "TICK" for m in f) <= 1 for f in frames), "one TICK per frame"
-    assert len(frames) < (TICKS_PER_WEEK - 100) / 50, "it batches many ticks per frame"
+    assert len(frames) == 1 + math.ceil((TICKS_PER_WEEK - 100) / FF_TICKS_PER_FRAME), "FF_TICKS_PER_FRAME ticks per frame"
     headlines = [m["news"]["headline"] for f in frames for m in f if m["type"] == "NEWS" and m["news"]]
     assert headlines == [e["headline"] for e in game.scheduled_news if 100 < e["trigger_tick"] <= TICKS_PER_WEEK]
     assert headlines, "news breaks during the skip"
     assert game.frame() == [], "paused at the boundary"
+
+
+def test_a_slow_machine_skips_in_smaller_frames(monkeypatch):
+    monkeypatch.setattr(g, "FF_FRAME_BUDGET", 0.0)  # out of time after every tick
+    game = new(seed=4)
+    game.fast_forward("WEEK")
+    for n in range(1, 4):
+        game.frame()
+        assert game.tick == n
+    assert game.ff is not None
+
+
+def test_skips_save_candles_once_per_frame():
+    from database import SessionLocal
+    from models import Candle
+    game = new(seed=4)
+    run_skip(game, "WEEK")
+    with SessionLocal() as db:
+        saved = db.query(Candle).filter(Candle.ticker == "TCHN").count()
+    assert saved == len(game.markets["TCHN"].history) - 50, "every completed candle of the week is saved"
 
 
 def test_a_skip_plays_exactly_like_normal_ticks():

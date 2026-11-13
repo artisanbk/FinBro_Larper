@@ -23,7 +23,7 @@ def test_page_script(server_factory):
     server = server_factory()  # fresh: the harness expects an untouched, paused game
     result = subprocess.run(
         [NODE, str(ROOT / "tests" / "page_harness.js"), str(ROOT / "static" / "index.html"), server.host],
-        capture_output=True, text=True, timeout=120,
+        capture_output=True, text=True, timeout=300,  # slow CI runners take several times longer
     )
     failures = [line for line in result.stdout.splitlines() if line.startswith("FAIL")]
     assert result.returncode == 0, "\n".join(failures) or result.stdout + result.stderr

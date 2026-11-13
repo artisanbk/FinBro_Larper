@@ -307,7 +307,8 @@ class Game:
             sentiment, excited = self._news_effect(market)
             market.step(self.tick, sentiment, excited)
 
-        self._save_candles()
+        if self.ff is None:
+            self._save_candles()  # while skipping, frame() saves once per frame instead
         if self.tick % TICKS_PER_HOUR == 0:
             self.net_worth_history.append(round(self.net_worth(), 2))
         messages.append({
@@ -342,6 +343,7 @@ class Game:
                 break
             if time.perf_counter() > deadline:
                 break
+        self._save_candles()
         return _coalesce(messages)
 
     def market_update(self) -> dict | None:
