@@ -66,7 +66,7 @@ A single-player, month-long (28 in-game days) stock market trading game.
   4. Done (2026-11-13): the report has one event study per headline (the metric above); the page charts it per headline, and rumors are revealed there.
   5. Done (2026-11-13): a 28-day month (4 weeks). Skip week pauses at the next week; Skip month plays to the end. Both run the real simulation at 2 in-game days per second (`Game.frame` batches ticks through `advance`), so news and fills still happen and a seeded game plays the same skipped or not. Shortcuts: W and M. `NEW_GAME` takes `days` for short test games.
   - Found along the way: the page harness exited 0 when it crashed, so a page syntax error (an unescaped apostrophe, from feature 2) passed the suite. The harness now reports crashes and `test_page` requires `ALL PASSED`.
-  - Released as v1.1.0 (tagged 2026-11-13). The build creates a draft GitHub release that the user reviews and publishes. `TODO.md` (untracked) is the user's progress list.
+  - Published as v1.1.0 on 2026-11-13, the latest GitHub release. Before release, Windows skips crawled because every SQLite commit synced to disk; disabling the sync fixed it. `TODO.md` (untracked) is the user's progress list.
 
 - **Volatility:** quiet-period volatility is about 65–80% of target. Raising `config.PROFILES[...].daily_vol` would close the gap.
 - **Builds:** There's no macOS build (the user asked for Linux and Windows). The executables are unsigned, so Windows SmartScreen warns on first launch.
